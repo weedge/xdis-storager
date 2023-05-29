@@ -5,7 +5,7 @@ import (
 
 	"github.com/weedge/pkg/driver"
 	"github.com/weedge/pkg/utils"
-	openkvDriver "github.com/weedge/xdis-storager/driver"
+	kvDriver "github.com/weedge/xdis-storager/driver"
 )
 
 // DB core sturct
@@ -17,7 +17,7 @@ type DB struct {
 	// database index to varint buffer
 	indexVarBuf []byte
 	// IKVStoreDB impl
-	openkvDriver.IKVStoreDB
+	kvDriver.IKVStoreDB
 
 	string *DBString
 	list   *DBList
