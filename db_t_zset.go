@@ -2,6 +2,7 @@ package storager
 
 import (
 	"bytes"
+	"strings"
 	"sync"
 	"time"
 
@@ -309,7 +310,7 @@ func (db *DBZSet) ZCount(key []byte, min int64, max int64) (int64, error) {
 	minKey := db.zEncodeStartScoreKey(key, min)
 	maxKey := db.zEncodeStopScoreKey(key, max)
 
-	rangeType := openkv.RangeROpen
+	rangeType := driver.RangeROpen
 
 	it := db.IKVStoreDB.RangeLimitIterator(minKey, maxKey, rangeType, 0, -1)
 	var n int64
@@ -347,10 +348,10 @@ func (db *DBZSet) zrank(key []byte, member []byte, reverse bool) (int64, error) 
 	if !reverse {
 		minKey := db.zEncodeStartScoreKey(key, MinScore)
 
-		rit = openkv.NewRangeIterator(it, &openkv.Range{Min: minKey, Max: sk, Type: openkv.RangeClose})
+		rit = openkv.NewRangeIterator(it, &openkv.Range{Min: minKey, Max: sk, Type: driver.RangeClose})
 	} else {
 		maxKey := db.zEncodeStopScoreKey(key, MaxScore)
-		rit = openkv.NewRevRangeIterator(it, &openkv.Range{Min: sk, Max: maxKey, Type: openkv.RangeClose})
+		rit = openkv.NewRevRangeIterator(it, &openkv.Range{Min: sk, Max: maxKey, Type: driver.RangeClose})
 	}
 
 	var lastKey []byte
@@ -375,9 +376,9 @@ func (db *DBZSet) zIterator(key []byte, min int64, max int64, offset int, count 
 	maxKey := db.zEncodeStopScoreKey(key, max)
 
 	if !reverse {
-		return db.IKVStoreDB.RangeLimitIterator(minKey, maxKey, openkv.RangeClose, offset, count)
+		return db.IKVStoreDB.RangeLimitIterator(minKey, maxKey, driver.RangeClose, offset, count)
 	}
-	return db.IKVStoreDB.RevRangeLimitIterator(minKey, maxKey, openkv.RangeClose, offset, count)
+	return db.IKVStoreDB.RevRangeLimitIterator(minKey, maxKey, driver.RangeClose, offset, count)
 }
 
 func (db *DBZSet) zRange(key []byte, min int64, max int64, offset int, count int, reverse bool) ([]driver.ScorePair, error) {
@@ -632,7 +633,7 @@ func (db *DBZSet) Persist(key []byte) (int64, error) {
 }
 
 func getAggregateFunc(aggregate []byte) func(int64, int64) int64 {
-	aggr := utils.Bytes2String(aggregate)
+	aggr := strings.ToLower(utils.Bytes2String(aggregate))
 	switch aggr {
 	case AggregateSum:
 		return func(a int64, b int64) int64 {
@@ -787,7 +788,7 @@ func (db *DBZSet) ZInterStore(destKey []byte, srcKeys [][]byte, weights []int64,
 }
 
 // ZRangeByLex scans the zset lexicographically
-func (db *DBZSet) ZRangeByLex(key []byte, min []byte, max []byte, rangeType uint8, offset int, count int) ([][]byte, error) {
+func (db *DBZSet) ZRangeByLex(key []byte, min []byte, max []byte, rangeType driver.RangeType, offset int, count int) ([][]byte, error) {
 	if min == nil {
 		min = db.zEncodeStartSetKey(key)
 	} else {
@@ -813,7 +814,7 @@ func (db *DBZSet) ZRangeByLex(key []byte, min []byte, max []byte, rangeType uint
 }
 
 // ZRemRangeByLex remvoes members in [min, max] lexicographically
-func (db *DBZSet) ZRemRangeByLex(key []byte, min []byte, max []byte, rangeType uint8) (int64, error) {
+func (db *DBZSet) ZRemRangeByLex(key []byte, min []byte, max []byte, rangeType driver.RangeType) (int64, error) {
 	if min == nil {
 		min = db.zEncodeStartSetKey(key)
 	} else {
@@ -846,7 +847,7 @@ func (db *DBZSet) ZRemRangeByLex(key []byte, min []byte, max []byte, rangeType u
 }
 
 // ZLexCount gets the count of zset lexicographically.
-func (db *DBZSet) ZLexCount(key []byte, min []byte, max []byte, rangeType uint8) (int64, error) {
+func (db *DBZSet) ZLexCount(key []byte, min []byte, max []byte, rangeType driver.RangeType) (int64, error) {
 	if min == nil {
 		min = db.zEncodeStartSetKey(key)
 	} else {

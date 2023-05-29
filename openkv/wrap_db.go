@@ -4,7 +4,8 @@ import (
 	"sync"
 	"time"
 
-	driver "github.com/weedge/pkg/driver/openkv"
+	"github.com/weedge/pkg/driver"
+	openkvDriver "github.com/weedge/pkg/driver/openkv"
 	"github.com/weedge/pkg/utils"
 	"github.com/weedge/xdis-storager/config"
 )
@@ -15,7 +16,7 @@ type DB struct {
 	// store common conf
 	opts *config.StorgerOptions
 	// kv op interface
-	driver.IDB
+	openkvDriver.IDB
 	// kv store engine name
 	name string
 
@@ -113,30 +114,30 @@ func (m *DB) needSyncCommit() (need bool) {
 // for db range Iterator
 
 // RangeIterator
-func (db *DB) RangeIterator(min []byte, max []byte, rangeType uint8) *RangeLimitIterator {
+func (db *DB) RangeIterator(min []byte, max []byte, rangeType driver.RangeType) *RangeLimitIterator {
 	return NewRangeLimitIterator(db.NewIterator(), &Range{min, max, rangeType}, &Limit{0, -1})
 }
 
 // RevRangeIterator
-func (db *DB) RevRangeIterator(min []byte, max []byte, rangeType uint8) *RangeLimitIterator {
+func (db *DB) RevRangeIterator(min []byte, max []byte, rangeType driver.RangeType) *RangeLimitIterator {
 	return NewRevRangeLimitIterator(db.NewIterator(), &Range{min, max, rangeType}, &Limit{0, -1})
 }
 
 // RangeLimitIterator count < 0, unlimit.
 // offset must >= 0, if < 0, will get nothing.
-func (db *DB) RangeLimitIterator(min []byte, max []byte, rangeType uint8, offset int, count int) *RangeLimitIterator {
+func (db *DB) RangeLimitIterator(min []byte, max []byte, rangeType driver.RangeType, offset int, count int) *RangeLimitIterator {
 	return NewRangeLimitIterator(db.NewIterator(), &Range{min, max, rangeType}, &Limit{offset, count})
 }
 
 // RevRangeLimitIterator count < 0, unlimit.
 // offset must >= 0, if < 0, will get nothing.
-func (db *DB) RevRangeLimitIterator(min []byte, max []byte, rangeType uint8, offset int, count int) *RangeLimitIterator {
+func (db *DB) RevRangeLimitIterator(min []byte, max []byte, rangeType driver.RangeType, offset int, count int) *RangeLimitIterator {
 	return NewRevRangeLimitIterator(db.NewIterator(), &Range{min, max, rangeType}, &Limit{offset, count})
 }
 
 // GetSlice wrap to adapte diff language kv store get op
-func (db *DB) GetSlice(key []byte) (driver.ISlice, error) {
-	if d, ok := db.IDB.(driver.ISliceGeter); ok {
+func (db *DB) GetSlice(key []byte) (openkvDriver.ISlice, error) {
+	if d, ok := db.IDB.(openkvDriver.ISliceGeter); ok {
 		v, err := d.GetSlice(key)
 		return v, err
 	}
@@ -146,5 +147,5 @@ func (db *DB) GetSlice(key []byte) (driver.ISlice, error) {
 	} else if v == nil {
 		return nil, nil
 	}
-	return driver.GoSlice(v), nil
+	return openkvDriver.GoSlice(v), nil
 }

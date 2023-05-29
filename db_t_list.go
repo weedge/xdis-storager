@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weedge/pkg/driver"
 	"github.com/weedge/xdis-storager/openkv"
 )
 
@@ -58,7 +59,7 @@ func (db *DBList) delete(t *Batch, key []byte) (num int64, err error) {
 	rit := openkv.NewRangeIterator(it, &openkv.Range{
 		Min:  startKey,
 		Max:  stopKey,
-		Type: openkv.RangeClose})
+		Type: driver.RangeClose})
 	for ; rit.Valid(); rit.Next() {
 		t.Delete(rit.RawKey())
 		num++
@@ -491,7 +492,7 @@ func (db *DBList) LRange(key []byte, start int32, stop int32) ([][]byte, error) 
 		&openkv.Range{
 			Min:  startKey,
 			Max:  nil,
-			Type: openkv.RangeClose},
+			Type: driver.RangeClose},
 		&openkv.Limit{
 			Offset: 0,
 			Count:  int(limit)})

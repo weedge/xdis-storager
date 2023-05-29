@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weedge/xdis-storager/openkv"
+	"github.com/weedge/pkg/driver"
 )
 
 type DBSet struct {
@@ -34,7 +34,7 @@ func (db *DBSet) delete(t *Batch, key []byte) (num int64, err error) {
 	start := db.sEncodeStartKey(key)
 	stop := db.sEncodeStopKey(key)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, openkv.RangeROpen, 0, -1)
+	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	for ; it.Valid(); it.Next() {
 		t.Delete(it.RawKey())
 		num++
@@ -288,7 +288,7 @@ func (db *DBSet) SMembers(key []byte) ([][]byte, error) {
 
 	v := make([][]byte, 0, 16)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, openkv.RangeROpen, 0, -1)
+	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	defer it.Close()
 
 	for ; it.Valid(); it.Next() {

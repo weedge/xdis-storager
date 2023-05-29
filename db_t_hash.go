@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/weedge/pkg/driver"
-	"github.com/weedge/xdis-storager/openkv"
 )
 
 type DBHash struct {
@@ -37,7 +36,7 @@ func (db *DBHash) delete(t *Batch, key []byte) (num int64, err error) {
 	start := db.hEncodeStartKey(key)
 	stop := db.hEncodeStopKey(key)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, openkv.RangeROpen, 0, -1)
+	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	for ; it.Valid(); it.Next() {
 		t.Delete(it.Key())
 		num++
@@ -286,7 +285,7 @@ func (db *DBHash) HGetAll(key []byte) ([]driver.FVPair, error) {
 
 	v := make([]driver.FVPair, 0, 16)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, openkv.RangeROpen, 0, -1)
+	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	defer it.Close()
 
 	for ; it.Valid(); it.Next() {
@@ -312,7 +311,7 @@ func (db *DBHash) HKeys(key []byte) ([][]byte, error) {
 
 	v := make([][]byte, 0, 16)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, openkv.RangeROpen, 0, -1)
+	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	defer it.Close()
 
 	for ; it.Valid(); it.Next() {
@@ -337,7 +336,7 @@ func (db *DBHash) HValues(key []byte) ([][]byte, error) {
 
 	v := make([][]byte, 0, 16)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, openkv.RangeROpen, 0, -1)
+	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	defer it.Close()
 
 	for ; it.Valid(); it.Next() {

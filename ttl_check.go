@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weedge/xdis-storager/openkv"
+	"github.com/weedge/pkg/driver"
 )
 
 type onExpired func(*Batch, []byte) (int64, error)
@@ -71,7 +71,7 @@ func (c *TTLChecker) check() {
 	minKey := c.db.expEncodeTimeKey(NoneType, nil, 0)
 	maxKey := c.db.expEncodeTimeKey(maxDataType, nil, nc)
 
-	it := c.db.IKVStoreDB.RangeLimitIterator(minKey, maxKey, openkv.RangeROpen, 0, -1)
+	it := c.db.IKVStoreDB.RangeLimitIterator(minKey, maxKey, driver.RangeROpen, 0, -1)
 	for ; it.Valid(); it.Next() {
 		tk := it.RawKey()
 		mk := it.RawValue()

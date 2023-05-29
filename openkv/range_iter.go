@@ -1,6 +1,10 @@
 package openkv
 
-import "bytes"
+import (
+	"bytes"
+
+	"github.com/weedge/pkg/driver"
+)
 
 const (
 	IteratorForward  uint8 = 0
@@ -26,7 +30,7 @@ type Range struct {
 	Min []byte
 	Max []byte
 
-	Type uint8
+	Type driver.RangeType
 }
 
 type Limit struct {
@@ -59,7 +63,7 @@ func (it *RangeLimitIterator) Valid() bool {
 
 	if it.direction == IteratorForward && it.r.Max != nil {
 		r := bytes.Compare(it.RawKey(), it.r.Max)
-		if it.r.Type&RangeROpen > 0 {
+		if it.r.Type&driver.RangeROpen > 0 {
 			return !(r >= 0)
 		}
 		return !(r > 0)
@@ -67,7 +71,7 @@ func (it *RangeLimitIterator) Valid() bool {
 
 	if it.direction != IteratorForward && it.r.Min != nil {
 		r := bytes.Compare(it.RawKey(), it.r.Min)
-		if it.r.Type&RangeLOpen > 0 {
+		if it.r.Type&driver.RangeLOpen > 0 {
 			return !(r <= 0)
 		}
 		return !(r < 0)
@@ -119,7 +123,7 @@ func rangeLimitIterator(i *Iterator, r *Range, l *Limit, direction uint8) *Range
 			i.SeekToFirst()
 		} else {
 			i.Seek(r.Min)
-			if r.Type&RangeLOpen > 0 {
+			if r.Type&driver.RangeLOpen > 0 {
 				if i.Valid() && bytes.Equal(i.RawKey(), r.Min) {
 					i.Next()
 				}
@@ -138,7 +142,7 @@ func rangeLimitIterator(i *Iterator, r *Range, l *Limit, direction uint8) *Range
 				}
 			}
 
-			if r.Type&RangeROpen > 0 {
+			if r.Type&driver.RangeROpen > 0 {
 				if i.Valid() && bytes.Equal(i.RawKey(), r.Max) {
 					i.Prev()
 				}

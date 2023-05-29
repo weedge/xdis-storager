@@ -1,6 +1,7 @@
 package storager
 
 import (
+	"github.com/weedge/pkg/driver"
 	"github.com/weedge/pkg/utils"
 	"github.com/weedge/xdis-storager/openkv"
 )
@@ -66,15 +67,15 @@ func checkScanCount(count int) int {
 }
 
 func (db *DB) buildScanIterator(minKey []byte, maxKey []byte, inclusive bool, reverse bool) *openkv.RangeLimitIterator {
-	tp := openkv.RangeOpen
+	tp := driver.RangeOpen
 
 	if !reverse {
 		if inclusive {
-			tp = openkv.RangeROpen
+			tp = driver.RangeROpen
 		}
 	} else {
 		if inclusive {
-			tp = openkv.RangeLOpen
+			tp = driver.RangeLOpen
 		}
 	}
 
