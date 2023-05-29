@@ -124,6 +124,8 @@ github.com/weedge/pkg v0.0.0-20230528164717-6a146c71a0b4 h1:T76VnfKvel38aRORQ+T6
 github.com/weedge/pkg v0.0.0-20230528164717-6a146c71a0b4/go.mod h1:K/SeqBpX8GSebm2av2h/xfsw1+PzdHRnL8HVQsY4o9w=
 github.com/weedge/pkg v0.0.0-20230529040102-99562deec14f h1:RT9LL5AP1XBxXftBqDT/G7eChPJ44h0cAkUSzlG3fBA=
 github.com/weedge/pkg v0.0.0-20230529040102-99562deec14f/go.mod h1:K/SeqBpX8GSebm2av2h/xfsw1+PzdHRnL8HVQsY4o9w=
+github.com/weedge/pkg v0.0.0-20230529092512-c70e8d555d49 h1:3YhGn26G4qaXBwJb6Q/h0VOEhRL9BBMbzhgDFDeY95c=
+github.com/weedge/pkg v0.0.0-20230529092512-c70e8d555d49/go.mod h1:K/SeqBpX8GSebm2av2h/xfsw1+PzdHRnL8HVQsY4o9w=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
