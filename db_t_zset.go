@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/weedge/pkg/driver"
+	"github.com/weedge/pkg/utils"
 	"github.com/weedge/xdis-storager/openkv"
 )
 
@@ -630,8 +631,9 @@ func (db *DBZSet) Persist(key []byte) (int64, error) {
 	return n, err
 }
 
-func getAggregateFunc(aggregate byte) func(int64, int64) int64 {
-	switch aggregate {
+func getAggregateFunc(aggregate []byte) func(int64, int64) int64 {
+	aggr := utils.Bytes2String(aggregate)
+	switch aggr {
 	case AggregateSum:
 		return func(a int64, b int64) int64 {
 			return a + b
@@ -655,7 +657,7 @@ func getAggregateFunc(aggregate byte) func(int64, int64) int64 {
 }
 
 // ZUnionStore unions the zsets and stores to dest zset.
-func (db *DBZSet) ZUnionStore(destKey []byte, srcKeys [][]byte, weights []int64, aggregate byte) (int64, error) {
+func (db *DBZSet) ZUnionStore(destKey []byte, srcKeys [][]byte, weights []int64, aggregate []byte) (int64, error) {
 
 	var destMap = map[string]int64{}
 	aggregateFunc := getAggregateFunc(aggregate)
@@ -717,8 +719,7 @@ func (db *DBZSet) ZUnionStore(destKey []byte, srcKeys [][]byte, weights []int64,
 }
 
 // ZInterStore intersects the zsets and stores to dest zset.
-func (db *DBZSet) ZInterStore(destKey []byte, srcKeys [][]byte, weights []int64, aggregate byte) (int64, error) {
-
+func (db *DBZSet) ZInterStore(destKey []byte, srcKeys [][]byte, weights []int64, aggregate []byte) (int64, error) {
 	aggregateFunc := getAggregateFunc(aggregate)
 	if aggregateFunc == nil {
 		return 0, ErrInvalidAggregate

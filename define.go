@@ -1,6 +1,9 @@
 package storager
 
-import "errors"
+import (
+	"errors"
+	"math"
+)
 
 // For different const size configuration
 const (
@@ -152,7 +155,7 @@ var (
 	ErrBitmapKey = errors.New("invalid encode bitmap key")
 
 	// For different common errors
-	ErrScoreMiss    = errors.New("zset score miss")
+	ErrScoreMiss = errors.New("zset score miss")
 )
 
 // For list op
@@ -183,13 +186,13 @@ const (
 
 // For zset op
 const (
-	MinScore     int64 = -1<<63 + 1
-	MaxScore     int64 = 1<<63 - 1
-	InvalidScore int64 = -1 << 63
+	MinScore     int64 = math.MinInt64 + 1
+	MaxScore     int64 = math.MaxInt64
+	InvalidScore int64 = math.MinInt64
 
-	AggregateSum byte = 0
-	AggregateMin byte = 1
-	AggregateMax byte = 2
+	AggregateSum = "sum"
+	AggregateMin = "min"
+	AggregateMax = "max"
 
 	zsetNScoreSep    byte = '<'
 	zsetPScoreSep    byte = zsetNScoreSep + 1
