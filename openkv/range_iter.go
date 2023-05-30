@@ -11,21 +11,6 @@ const (
 	IteratorBackward uint8 = 1
 )
 
-const (
-	RangeClose uint8 = 0x00
-	RangeLOpen uint8 = 0x01
-	RangeROpen uint8 = 0x10
-	RangeOpen  uint8 = 0x11
-)
-
-// Range min must less or equal than max
-//
-// range type:
-//
-//	close: [min, max]
-//	open: (min, max)
-//	lopen: (min, max]
-//	ropen: [min, max)
 type Range struct {
 	Min []byte
 	Max []byte
