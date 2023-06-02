@@ -552,6 +552,8 @@ func (db *DB) encodeScanKey(storeDataType byte, key []byte) ([]byte, error) {
 		return db.zEncodeSizeKey(key), nil
 	case SSizeType:
 		return db.sEncodeSizeKey(key), nil
+	case BitmapType:
+		return db.encodeBitmapKey(key), nil
 	default:
 		return nil, ErrDataType
 	}
