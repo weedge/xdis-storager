@@ -1,6 +1,7 @@
 package storager
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"time"
@@ -22,7 +23,7 @@ func NewDBHash(db *DB) *DBHash {
 	return &DBHash{DB: db, batch: batch}
 }
 
-func checkHashKFSize(key []byte, field []byte) error {
+func checkHashKFSize(ctx context.Context, key []byte, field []byte) error {
 	if len(key) > MaxKeySize || len(key) == 0 {
 		return ErrKeySize
 	} else if len(field) > MaxHashFieldSize || len(field) == 0 {
@@ -48,7 +49,7 @@ func (db *DBHash) delete(t *Batch, key []byte) (num int64, err error) {
 }
 
 // Del cleans multi hash data.
-func (db *DBHash) Del(keys ...[]byte) (int64, error) {
+func (db *DBHash) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
@@ -66,7 +67,7 @@ func (db *DBHash) Del(keys ...[]byte) (int64, error) {
 	return int64(len(keys)), err
 }
 
-func (db *DBHash) hSetItem(key []byte, field []byte, value []byte) (int64, error) {
+func (db *DBHash) hSetItem(ctx context.Context, key []byte, field []byte, value []byte) (int64, error) {
 	t := db.batch
 
 	ek := db.hEncodeHashKey(key, field)
@@ -75,7 +76,7 @@ func (db *DBHash) hSetItem(key []byte, field []byte, value []byte) (int64, error
 	if v, _ := db.IKV.Get(ek); v != nil {
 		n = 0
 	} else {
-		if _, err := db.hIncrSize(key, 1); err != nil {
+		if _, err := db.hIncrSize(ctx, key, 1); err != nil {
 			return 0, err
 		}
 	}
@@ -84,7 +85,7 @@ func (db *DBHash) hSetItem(key []byte, field []byte, value []byte) (int64, error
 	return n, nil
 }
 
-func (db *DBHash) hIncrSize(key []byte, delta int64) (int64, error) {
+func (db *DBHash) hIncrSize(ctx context.Context, key []byte, delta int64) (int64, error) {
 	t := db.batch
 	sk := db.hEncodeSizeKey(key)
 
@@ -107,7 +108,7 @@ func (db *DBHash) hIncrSize(key []byte, delta int64) (int64, error) {
 }
 
 // HLen returns the lengh of hash.
-func (db *DBHash) HLen(key []byte) (int64, error) {
+func (db *DBHash) HLen(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -116,8 +117,8 @@ func (db *DBHash) HLen(key []byte) (int64, error) {
 }
 
 // uHSet sets the field with value of key.
-func (db *DBHash) HSet(key []byte, field []byte, value []byte) (int64, error) {
-	if err := checkHashKFSize(key, field); err != nil {
+func (db *DBHash) HSet(ctx context.Context, key []byte, field []byte, value []byte) (int64, error) {
+	if err := checkHashKFSize(ctx, key, field); err != nil {
 		return 0, err
 	} else if err := checkValueSize(value); err != nil {
 		return 0, err
@@ -127,7 +128,7 @@ func (db *DBHash) HSet(key []byte, field []byte, value []byte) (int64, error) {
 	t.Lock()
 	defer t.Unlock()
 
-	n, err := db.hSetItem(key, field, value)
+	n, err := db.hSetItem(ctx, key, field, value)
 	if err != nil {
 		return 0, err
 	}
@@ -137,8 +138,8 @@ func (db *DBHash) HSet(key []byte, field []byte, value []byte) (int64, error) {
 }
 
 // HGet gets the value of the field.
-func (db *DBHash) HGet(key []byte, field []byte) ([]byte, error) {
-	if err := checkHashKFSize(key, field); err != nil {
+func (db *DBHash) HGet(ctx context.Context, key []byte, field []byte) ([]byte, error) {
+	if err := checkHashKFSize(ctx, key, field); err != nil {
 		return nil, err
 	}
 
@@ -146,7 +147,7 @@ func (db *DBHash) HGet(key []byte, field []byte) ([]byte, error) {
 }
 
 // HMset sets multi field-values.
-func (db *DBHash) HMset(key []byte, args ...driver.FVPair) error {
+func (db *DBHash) HMset(ctx context.Context, key []byte, args ...driver.FVPair) error {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
@@ -155,7 +156,7 @@ func (db *DBHash) HMset(key []byte, args ...driver.FVPair) error {
 	var ek []byte
 	var num int64
 	for i := 0; i < len(args); i++ {
-		if err := checkHashKFSize(key, args[i].Field); err != nil {
+		if err := checkHashKFSize(ctx, key, args[i].Field); err != nil {
 			return err
 		} else if err := checkValueSize(args[i].Value); err != nil {
 			return err
@@ -172,7 +173,7 @@ func (db *DBHash) HMset(key []byte, args ...driver.FVPair) error {
 		t.Put(ek, args[i].Value)
 	}
 
-	if _, err = db.hIncrSize(key, num); err != nil {
+	if _, err = db.hIncrSize(ctx, key, num); err != nil {
 		return err
 	}
 
@@ -182,7 +183,7 @@ func (db *DBHash) HMset(key []byte, args ...driver.FVPair) error {
 }
 
 // HMget gets multi values of fields
-func (db *DBHash) HMget(key []byte, args ...[]byte) ([][]byte, error) {
+func (db *DBHash) HMget(ctx context.Context, key []byte, args ...[]byte) ([][]byte, error) {
 	var ek []byte
 
 	it := db.IKV.NewIterator()
@@ -190,7 +191,7 @@ func (db *DBHash) HMget(key []byte, args ...[]byte) ([][]byte, error) {
 
 	r := make([][]byte, len(args))
 	for i := 0; i < len(args); i++ {
-		if err := checkHashKFSize(key, args[i]); err != nil {
+		if err := checkHashKFSize(ctx, key, args[i]); err != nil {
 			return nil, err
 		}
 
@@ -203,7 +204,7 @@ func (db *DBHash) HMget(key []byte, args ...[]byte) ([][]byte, error) {
 }
 
 // HDel deletes the fields.
-func (db *DBHash) HDel(key []byte, args ...[]byte) (int64, error) {
+func (db *DBHash) HDel(ctx context.Context, key []byte, args ...[]byte) (int64, error) {
 	t := db.batch
 
 	var ek []byte
@@ -218,7 +219,7 @@ func (db *DBHash) HDel(key []byte, args ...[]byte) (int64, error) {
 
 	var num int64
 	for i := 0; i < len(args); i++ {
-		if err := checkHashKFSize(key, args[i]); err != nil {
+		if err := checkHashKFSize(ctx, key, args[i]); err != nil {
 			return 0, err
 		}
 
@@ -233,7 +234,7 @@ func (db *DBHash) HDel(key []byte, args ...[]byte) (int64, error) {
 		}
 	}
 
-	if _, err = db.hIncrSize(key, -num); err != nil {
+	if _, err = db.hIncrSize(ctx, key, -num); err != nil {
 		return 0, err
 	}
 
@@ -243,8 +244,8 @@ func (db *DBHash) HDel(key []byte, args ...[]byte) (int64, error) {
 }
 
 // HIncrBy increases the value of field by delta.
-func (db *DBHash) HIncrBy(key []byte, field []byte, delta int64) (int64, error) {
-	if err := checkHashKFSize(key, field); err != nil {
+func (db *DBHash) HIncrBy(ctx context.Context, key []byte, field []byte, delta int64) (int64, error) {
+	if err := checkHashKFSize(ctx, key, field); err != nil {
 		return 0, err
 	}
 
@@ -264,7 +265,7 @@ func (db *DBHash) HIncrBy(key []byte, field []byte, delta int64) (int64, error) 
 
 	n += delta
 
-	_, err = db.hSetItem(key, field, strconv.AppendInt(nil, n, 10))
+	_, err = db.hSetItem(ctx, key, field, strconv.AppendInt(nil, n, 10))
 	if err != nil {
 		return 0, err
 	}
@@ -275,7 +276,7 @@ func (db *DBHash) HIncrBy(key []byte, field []byte, delta int64) (int64, error) 
 }
 
 // HGetAll returns all field-values.
-func (db *DBHash) HGetAll(key []byte) ([]driver.FVPair, error) {
+func (db *DBHash) HGetAll(ctx context.Context, key []byte) ([]driver.FVPair, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -301,7 +302,7 @@ func (db *DBHash) HGetAll(key []byte) ([]driver.FVPair, error) {
 }
 
 // HKeys returns the all fields.
-func (db *DBHash) HKeys(key []byte) ([][]byte, error) {
+func (db *DBHash) HKeys(ctx context.Context, key []byte) ([][]byte, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -326,7 +327,7 @@ func (db *DBHash) HKeys(key []byte) ([][]byte, error) {
 }
 
 // HValues returns all values
-func (db *DBHash) HValues(key []byte) ([][]byte, error) {
+func (db *DBHash) HValues(ctx context.Context, key []byte) ([][]byte, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -351,12 +352,12 @@ func (db *DBHash) HValues(key []byte) ([][]byte, error) {
 	return v, nil
 }
 
-func (db *DBHash) hExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBHash) hExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
 
-	if hlen, err := db.HLen(key); err != nil || hlen == 0 {
+	if hlen, err := db.HLen(ctx, key); err != nil || hlen == 0 {
 		return 0, err
 	}
 
@@ -369,25 +370,25 @@ func (db *DBHash) hExpireAt(key []byte, when int64) (int64, error) {
 }
 
 // Expire expires the data with duration.
-func (db *DBHash) Expire(key []byte, duration int64) (int64, error) {
+func (db *DBHash) Expire(ctx context.Context, key []byte, duration int64) (int64, error) {
 	if duration <= 0 {
 		return 0, ErrExpireValue
 	}
 
-	return db.hExpireAt(key, time.Now().Unix()+duration)
+	return db.hExpireAt(ctx, key, time.Now().Unix()+duration)
 }
 
 // ExpireAt expires the data at time when.
-func (db *DBHash) ExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBHash) ExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 	if when <= time.Now().Unix() {
 		return 0, ErrExpireValue
 	}
 
-	return db.hExpireAt(key, when)
+	return db.hExpireAt(ctx, key, when)
 }
 
 // TTL gets the TTL of data.
-func (db *DBHash) TTL(key []byte) (int64, error) {
+func (db *DBHash) TTL(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return -1, err
 	}
@@ -396,7 +397,7 @@ func (db *DBHash) TTL(key []byte) (int64, error) {
 }
 
 // Persist removes the TTL of data.
-func (db *DBHash) Persist(key []byte) (int64, error) {
+func (db *DBHash) Persist(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -415,7 +416,7 @@ func (db *DBHash) Persist(key []byte) (int64, error) {
 }
 
 // HKeyExists checks whether data exists or not.
-func (db *DBHash) Exists(key []byte) (int64, error) {
+func (db *DBHash) Exists(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -428,7 +429,7 @@ func (db *DBHash) Exists(key []byte) (int64, error) {
 }
 
 // Clear clears the data.
-func (db *DBHash) Clear(key []byte) (int64, error) {
+func (db *DBHash) Clear(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}

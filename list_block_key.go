@@ -37,8 +37,8 @@ func (l *lBlockKeys) signal(key []byte) {
 	delete(l.keys, s)
 }
 
-func (l *lBlockKeys) popOrWait(db *DBList, key []byte, whereSeq int32, fn context.CancelFunc) ([]interface{}, error) {
-	v, err := db.lpop(key, whereSeq)
+func (l *lBlockKeys) popOrWait(ctx context.Context, db *DBList, key []byte, whereSeq int32, fn context.CancelFunc) ([]interface{}, error) {
+	v, err := db.lpop(ctx, key, whereSeq)
 	if err != nil {
 		return nil, err
 	} else if v != nil {

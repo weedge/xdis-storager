@@ -1,9 +1,12 @@
 package storager
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // FlushDB flushes the data.
-func (db *DB) FlushDB() (drop int64, err error) {
+func (db *DB) FlushDB(ctx context.Context) (drop int64, err error) {
 	all := [](func() (int64, error)){
 		db.stringFlush,
 		db.listFlush,

@@ -1,6 +1,7 @@
 package storager
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -20,7 +21,7 @@ func NewDBSet(db *DB) *DBSet {
 		})
 	return &DBSet{DB: db, batch: batch}
 }
-func checkSetKMSize(key []byte, member []byte) error {
+func checkSetKMSize(ctx context.Context, key []byte, member []byte) error {
 	if len(key) > MaxKeySize || len(key) == 0 {
 		return ErrKeySize
 	} else if len(member) > MaxSetMemberSize || len(member) == 0 {
@@ -45,7 +46,7 @@ func (db *DBSet) delete(t *Batch, key []byte) (num int64, err error) {
 
 	return num, nil
 }
-func (db *DBSet) sIncrSize(key []byte, delta int64) (int64, error) {
+func (db *DBSet) sIncrSize(ctx context.Context, key []byte, delta int64) (int64, error) {
 	t := db.batch
 	sk := db.sEncodeSizeKey(key)
 
@@ -67,12 +68,12 @@ func (db *DBSet) sIncrSize(key []byte, delta int64) (int64, error) {
 	return size, nil
 }
 
-func (db *DBSet) sExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBSet) sExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
 
-	if scnt, err := db.SCard(key); err != nil || scnt == 0 {
+	if scnt, err := db.SCard(ctx, key); err != nil || scnt == 0 {
 		return 0, err
 	}
 	db.expireAt(t, SetType, key, when)
@@ -84,7 +85,7 @@ func (db *DBSet) sExpireAt(key []byte, when int64) (int64, error) {
 }
 
 // SAdd adds the value to the set.
-func (db *DBSet) SAdd(key []byte, args ...[]byte) (int64, error) {
+func (db *DBSet) SAdd(ctx context.Context, key []byte, args ...[]byte) (int64, error) {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
@@ -93,7 +94,7 @@ func (db *DBSet) SAdd(key []byte, args ...[]byte) (int64, error) {
 	var ek []byte
 	var num int64
 	for i := 0; i < len(args); i++ {
-		if err := checkSetKMSize(key, args[i]); err != nil {
+		if err := checkSetKMSize(ctx, key, args[i]); err != nil {
 			return 0, err
 		}
 
@@ -108,7 +109,7 @@ func (db *DBSet) SAdd(key []byte, args ...[]byte) (int64, error) {
 		t.Put(ek, nil)
 	}
 
-	if _, err = db.sIncrSize(key, num); err != nil {
+	if _, err = db.sIncrSize(ctx, key, num); err != nil {
 		return 0, err
 	}
 
@@ -118,7 +119,7 @@ func (db *DBSet) SAdd(key []byte, args ...[]byte) (int64, error) {
 }
 
 // SCard gets the size of set.
-func (db *DBSet) SCard(key []byte) (int64, error) {
+func (db *DBSet) SCard(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -128,10 +129,10 @@ func (db *DBSet) SCard(key []byte) (int64, error) {
 	return Int64(db.IKV.Get(sk))
 }
 
-func (db *DBSet) sDiffGeneric(keys ...[]byte) ([][]byte, error) {
+func (db *DBSet) sDiffGeneric(ctx context.Context, keys ...[]byte) ([][]byte, error) {
 	destMap := make(map[string]bool)
 
-	members, err := db.SMembers(keys[0])
+	members, err := db.SMembers(ctx, keys[0])
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +142,7 @@ func (db *DBSet) sDiffGeneric(keys ...[]byte) ([][]byte, error) {
 	}
 
 	for _, k := range keys[1:] {
-		members, err := db.SMembers(k)
+		members, err := db.SMembers(ctx, k)
 		if err != nil {
 			return nil, err
 		}
@@ -173,19 +174,19 @@ func (db *DBSet) sDiffGeneric(keys ...[]byte) ([][]byte, error) {
 }
 
 // SDiff gets the different of sets.
-func (db *DBSet) SDiff(keys ...[]byte) ([][]byte, error) {
-	v, err := db.sDiffGeneric(keys...)
+func (db *DBSet) SDiff(ctx context.Context, keys ...[]byte) ([][]byte, error) {
+	v, err := db.sDiffGeneric(ctx, keys...)
 	return v, err
 }
 
 // SDiffStore gets the different of sets and stores to dest set.
-func (db *DBSet) SDiffStore(dstKey []byte, keys ...[]byte) (int64, error) {
-	n, err := db.sStoreGeneric(dstKey, DiffType, keys...)
+func (db *DBSet) SDiffStore(ctx context.Context, dstKey []byte, keys ...[]byte) (int64, error) {
+	n, err := db.sStoreGeneric(ctx, dstKey, DiffType, keys...)
 	return n, err
 }
 
 // SKeyExists checks whether set existed or not.
-func (db *DBSet) SKeyExists(key []byte) (int64, error) {
+func (db *DBSet) SKeyExists(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -197,10 +198,10 @@ func (db *DBSet) SKeyExists(key []byte) (int64, error) {
 	return 0, err
 }
 
-func (db *DBSet) sInterGeneric(keys ...[]byte) ([][]byte, error) {
+func (db *DBSet) sInterGeneric(ctx context.Context, keys ...[]byte) ([][]byte, error) {
 	destMap := make(map[string]bool)
 
-	members, err := db.SMembers(keys[0])
+	members, err := db.SMembers(ctx, keys[0])
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +215,7 @@ func (db *DBSet) sInterGeneric(keys ...[]byte) ([][]byte, error) {
 			return nil, err
 		}
 
-		members, err := db.SMembers(key)
+		members, err := db.SMembers(ctx, key)
 		if err != nil {
 			return nil, err
 		} else if len(members) == 0 {
@@ -252,20 +253,20 @@ func (db *DBSet) sInterGeneric(keys ...[]byte) ([][]byte, error) {
 }
 
 // SInter intersects the sets.
-func (db *DBSet) SInter(keys ...[]byte) ([][]byte, error) {
-	v, err := db.sInterGeneric(keys...)
+func (db *DBSet) SInter(ctx context.Context, keys ...[]byte) ([][]byte, error) {
+	v, err := db.sInterGeneric(ctx, keys...)
 	return v, err
 
 }
 
 // SInterStore intersects the sets and stores to dest set.
-func (db *DBSet) SInterStore(dstKey []byte, keys ...[]byte) (int64, error) {
-	n, err := db.sStoreGeneric(dstKey, InterType, keys...)
+func (db *DBSet) SInterStore(ctx context.Context, dstKey []byte, keys ...[]byte) (int64, error) {
+	n, err := db.sStoreGeneric(ctx, dstKey, InterType, keys...)
 	return n, err
 }
 
 // SIsMember checks member in set.
-func (db *DBSet) SIsMember(key []byte, member []byte) (int64, error) {
+func (db *DBSet) SIsMember(ctx context.Context, key []byte, member []byte) (int64, error) {
 	ek := db.sEncodeSetKey(key, member)
 
 	var n int64 = 1
@@ -278,7 +279,7 @@ func (db *DBSet) SIsMember(key []byte, member []byte) (int64, error) {
 }
 
 // SMembers gets members of set.
-func (db *DBSet) SMembers(key []byte) ([][]byte, error) {
+func (db *DBSet) SMembers(ctx context.Context, key []byte) ([][]byte, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -304,7 +305,7 @@ func (db *DBSet) SMembers(key []byte) ([][]byte, error) {
 }
 
 // SRem removes the members of set.
-func (db *DBSet) SRem(key []byte, args ...[]byte) (int64, error) {
+func (db *DBSet) SRem(ctx context.Context, key []byte, args ...[]byte) (int64, error) {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
@@ -318,7 +319,7 @@ func (db *DBSet) SRem(key []byte, args ...[]byte) (int64, error) {
 
 	var num int64
 	for i := 0; i < len(args); i++ {
-		if err := checkSetKMSize(key, args[i]); err != nil {
+		if err := checkSetKMSize(ctx, key, args[i]); err != nil {
 			return 0, err
 		}
 
@@ -333,7 +334,7 @@ func (db *DBSet) SRem(key []byte, args ...[]byte) (int64, error) {
 		}
 	}
 
-	if _, err = db.sIncrSize(key, -num); err != nil {
+	if _, err = db.sIncrSize(ctx, key, -num); err != nil {
 		return 0, err
 	}
 
@@ -342,7 +343,7 @@ func (db *DBSet) SRem(key []byte, args ...[]byte) (int64, error) {
 
 }
 
-func (db *DBSet) sUnionGeneric(keys ...[]byte) ([][]byte, error) {
+func (db *DBSet) sUnionGeneric(ctx context.Context, keys ...[]byte) ([][]byte, error) {
 	dstMap := make(map[string]bool)
 
 	for _, key := range keys {
@@ -350,7 +351,7 @@ func (db *DBSet) sUnionGeneric(keys ...[]byte) ([][]byte, error) {
 			return nil, err
 		}
 
-		members, err := db.SMembers(key)
+		members, err := db.SMembers(ctx, key)
 		if err != nil {
 			return nil, err
 		}
@@ -374,18 +375,18 @@ func (db *DBSet) sUnionGeneric(keys ...[]byte) ([][]byte, error) {
 }
 
 // SUnion unions the sets.
-func (db *DBSet) SUnion(keys ...[]byte) ([][]byte, error) {
-	v, err := db.sUnionGeneric(keys...)
+func (db *DBSet) SUnion(ctx context.Context, keys ...[]byte) ([][]byte, error) {
+	v, err := db.sUnionGeneric(ctx, keys...)
 	return v, err
 }
 
 // SUnionStore unions the sets and stores to the dest set.
-func (db *DBSet) SUnionStore(dstKey []byte, keys ...[]byte) (int64, error) {
-	n, err := db.sStoreGeneric(dstKey, UnionType, keys...)
+func (db *DBSet) SUnionStore(ctx context.Context, dstKey []byte, keys ...[]byte) (int64, error) {
+	n, err := db.sStoreGeneric(ctx, dstKey, UnionType, keys...)
 	return n, err
 }
 
-func (db *DBSet) sStoreGeneric(dstKey []byte, optType byte, keys ...[]byte) (int64, error) {
+func (db *DBSet) sStoreGeneric(ctx context.Context, dstKey []byte, optType byte, keys ...[]byte) (int64, error) {
 	if err := checkKeySize(dstKey); err != nil {
 		return 0, err
 	}
@@ -402,11 +403,11 @@ func (db *DBSet) sStoreGeneric(dstKey []byte, optType byte, keys ...[]byte) (int
 
 	switch optType {
 	case UnionType:
-		v, err = db.sUnionGeneric(keys...)
+		v, err = db.sUnionGeneric(ctx, keys...)
 	case DiffType:
-		v, err = db.sDiffGeneric(keys...)
+		v, err = db.sDiffGeneric(ctx, keys...)
 	case InterType:
-		v, err = db.sInterGeneric(keys...)
+		v, err = db.sInterGeneric(ctx, keys...)
 	}
 
 	if err != nil {
@@ -414,7 +415,7 @@ func (db *DBSet) sStoreGeneric(dstKey []byte, optType byte, keys ...[]byte) (int
 	}
 
 	for _, m := range v {
-		if err := checkSetKMSize(dstKey, m); err != nil {
+		if err := checkSetKMSize(ctx, dstKey, m); err != nil {
 			return 0, err
 		}
 
@@ -438,7 +439,7 @@ func (db *DBSet) sStoreGeneric(dstKey []byte, optType byte, keys ...[]byte) (int
 }
 
 // Del clears multi sets.
-func (db *DBSet) Del(keys ...[]byte) (int64, error) {
+func (db *DBSet) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
@@ -457,7 +458,7 @@ func (db *DBSet) Del(keys ...[]byte) (int64, error) {
 }
 
 // Exists checks whether set existed or not.
-func (db *DBSet) Exists(key []byte) (int64, error) {
+func (db *DBSet) Exists(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -470,27 +471,27 @@ func (db *DBSet) Exists(key []byte) (int64, error) {
 }
 
 // Expire expires the set.
-func (db *DBSet) Expire(key []byte, duration int64) (int64, error) {
+func (db *DBSet) Expire(ctx context.Context, key []byte, duration int64) (int64, error) {
 	if duration <= 0 {
 		return 0, ErrExpireValue
 	}
 
-	return db.sExpireAt(key, time.Now().Unix()+duration)
+	return db.sExpireAt(ctx, key, time.Now().Unix()+duration)
 
 }
 
 // ExpireAt expires the set at when.
-func (db *DBSet) ExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBSet) ExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 	if when <= time.Now().Unix() {
 		return 0, ErrExpireValue
 	}
 
-	return db.sExpireAt(key, when)
+	return db.sExpireAt(ctx, key, when)
 
 }
 
 // TTL gets the TTL of set.
-func (db *DBSet) TTL(key []byte) (int64, error) {
+func (db *DBSet) TTL(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return -1, err
 	}
@@ -499,7 +500,7 @@ func (db *DBSet) TTL(key []byte) (int64, error) {
 }
 
 // Persist removes the TTL of set.
-func (db *DBSet) Persist(key []byte) (int64, error) {
+func (db *DBSet) Persist(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}

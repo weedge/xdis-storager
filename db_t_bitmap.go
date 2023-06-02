@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"context"
 )
 
 type DBBitmap struct {
@@ -29,7 +31,7 @@ func (db *DBBitmap) delete(t *Batch, key []byte) (int64, error) {
 }
 
 // BitOP does the bit operations in data.
-func (db *DBBitmap) BitOP(op string, destKey []byte, srcKeys ...[]byte) (int64, error) {
+func (db *DBBitmap) BitOP(ctx context.Context, op string, destKey []byte, srcKeys ...[]byte) (int64, error) {
 	if err := checkKeySize(destKey); err != nil {
 		return 0, err
 	}
@@ -132,7 +134,7 @@ func numberBitCount(i uint32) uint32 {
 }
 
 // BitCount returns the bit count of data.
-func (db *DBBitmap) BitCount(key []byte, start int, end int) (int64, error) {
+func (db *DBBitmap) BitCount(ctx context.Context, key []byte, start int, end int) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -161,7 +163,7 @@ func (db *DBBitmap) BitCount(key []byte, start int, end int) (int64, error) {
 }
 
 // BitPos returns the pos of the data.
-func (db *DBBitmap) BitPos(key []byte, on int, start int, end int) (int64, error) {
+func (db *DBBitmap) BitPos(ctx context.Context, key []byte, on int, start int, end int) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -200,7 +202,7 @@ func (db *DBBitmap) BitPos(key []byte, on int, start int, end int) (int64, error
 }
 
 // SetBit sets the bit to the data.
-func (db *DBBitmap) SetBit(key []byte, offset int, on int) (int64, error) {
+func (db *DBBitmap) SetBit(ctx context.Context, key []byte, offset int, on int) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -248,7 +250,7 @@ func (db *DBBitmap) SetBit(key []byte, offset int, on int) (int64, error) {
 }
 
 // GetBit gets the bit of data at offset.
-func (db *DBBitmap) GetBit(key []byte, offset int) (int64, error) {
+func (db *DBBitmap) GetBit(ctx context.Context, key []byte, offset int) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -276,7 +278,7 @@ func (db *DBBitmap) GetBit(key []byte, offset int) (int64, error) {
 }
 
 // Del deletes the data.
-func (db *DBBitmap) Del(keys ...[]byte) (int64, error) {
+func (db *DBBitmap) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 	if len(keys) == 0 {
 		return 0, nil
 	}
@@ -300,7 +302,7 @@ func (db *DBBitmap) Del(keys ...[]byte) (int64, error) {
 }
 
 // Exists check data exists or not.
-func (db *DBBitmap) Exists(key []byte) (int64, error) {
+func (db *DBBitmap) Exists(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -318,29 +320,29 @@ func (db *DBBitmap) Exists(key []byte) (int64, error) {
 }
 
 // Expire expires the data.
-func (db *DBBitmap) Expire(key []byte, duration int64) (int64, error) {
+func (db *DBBitmap) Expire(ctx context.Context, key []byte, duration int64) (int64, error) {
 	if duration <= 0 {
 		return 0, ErrExpireValue
 	}
 
-	return db.setExpireAt(key, time.Now().Unix()+duration)
+	return db.setExpireAt(ctx, key, time.Now().Unix()+duration)
 }
 
 // ExpireAt expires the data at when.
-func (db *DBBitmap) ExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBBitmap) ExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 	if when <= time.Now().Unix() {
 		return 0, ErrExpireValue
 	}
 
-	return db.setExpireAt(key, when)
+	return db.setExpireAt(ctx, key, when)
 }
 
-func (db *DBBitmap) setExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBBitmap) setExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
 
-	if exist, err := db.Exists(key); err != nil || exist == 0 {
+	if exist, err := db.Exists(ctx, key); err != nil || exist == 0 {
 		return 0, err
 	}
 
@@ -353,7 +355,7 @@ func (db *DBBitmap) setExpireAt(key []byte, when int64) (int64, error) {
 }
 
 // TTL returns the TTL of the data.
-func (db *DBBitmap) TTL(key []byte) (int64, error) {
+func (db *DBBitmap) TTL(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return -1, err
 	}
@@ -362,7 +364,7 @@ func (db *DBBitmap) TTL(key []byte) (int64, error) {
 }
 
 // Persist removes the TTL of the data.
-func (db *DBBitmap) Persist(key []byte) (int64, error) {
+func (db *DBBitmap) Persist(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}

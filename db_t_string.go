@@ -1,6 +1,7 @@
 package storager
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"time"
@@ -44,7 +45,7 @@ func checkValueSize(value []byte) error {
 }
 
 // Set sets the data.
-func (db *DBString) Set(key []byte, value []byte) error {
+func (db *DBString) Set(ctx context.Context, key []byte, value []byte) error {
 	if err := checkKeySize(key); err != nil {
 		return err
 	}
@@ -66,7 +67,7 @@ func (db *DBString) Set(key []byte, value []byte) error {
 }
 
 // Get gets the value.
-func (db *DBString) Get(key []byte) ([]byte, error) {
+func (db *DBString) Get(ctx context.Context, key []byte) ([]byte, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -77,7 +78,7 @@ func (db *DBString) Get(key []byte) ([]byte, error) {
 }
 
 // GetSlice gets the slice of the data to adapt leveldb slice
-func (db *DBString) GetSlice(key []byte) (openkvDriver.ISlice, error) {
+func (db *DBString) GetSlice(ctx context.Context, key []byte) (openkvDriver.ISlice, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -88,7 +89,7 @@ func (db *DBString) GetSlice(key []byte) (openkvDriver.ISlice, error) {
 }
 
 // GetSet gets the value and sets new value.
-func (db *DBString) GetSet(key []byte, value []byte) ([]byte, error) {
+func (db *DBString) GetSet(ctx context.Context, key []byte, value []byte) ([]byte, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -116,26 +117,26 @@ func (db *DBString) GetSet(key []byte, value []byte) ([]byte, error) {
 }
 
 // Incr increases the data.
-func (db *DBString) Incr(key []byte) (int64, error) {
-	return db.incr(key, 1)
+func (db *DBString) Incr(ctx context.Context, key []byte) (int64, error) {
+	return db.incr(ctx, key, 1)
 }
 
 // IncrBy increases the data by increment.
-func (db *DBString) IncrBy(key []byte, increment int64) (int64, error) {
-	return db.incr(key, increment)
+func (db *DBString) IncrBy(ctx context.Context, key []byte, increment int64) (int64, error) {
+	return db.incr(ctx, key, increment)
 }
 
 // Decr decreases the data.
-func (db *DBString) Decr(key []byte) (int64, error) {
-	return db.incr(key, -1)
+func (db *DBString) Decr(ctx context.Context, key []byte) (int64, error) {
+	return db.incr(ctx, key, -1)
 }
 
 // DecrBy decreases the data by decrement.
-func (db *DBString) DecrBy(key []byte, decrement int64) (int64, error) {
-	return db.incr(key, -decrement)
+func (db *DBString) DecrBy(ctx context.Context, key []byte, decrement int64) (int64, error) {
+	return db.incr(ctx, key, -decrement)
 }
 
-func (db *DBString) incr(key []byte, delta int64) (int64, error) {
+func (db *DBString) incr(ctx context.Context, key []byte, delta int64) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -163,7 +164,7 @@ func (db *DBString) incr(key []byte, delta int64) (int64, error) {
 }
 
 // MGet gets multi data.
-func (db *DBString) MGet(keys ...[]byte) ([][]byte, error) {
+func (db *DBString) MGet(ctx context.Context, keys ...[]byte) ([][]byte, error) {
 	values := make([][]byte, len(keys))
 
 	it := db.IKV.NewIterator()
@@ -181,7 +182,7 @@ func (db *DBString) MGet(keys ...[]byte) ([][]byte, error) {
 }
 
 // MSet sets multi data.
-func (db *DBString) MSet(args ...driver.KVPair) error {
+func (db *DBString) MSet(ctx context.Context, args ...driver.KVPair) error {
 	if len(args) == 0 {
 		return nil
 	}
@@ -215,7 +216,7 @@ func (db *DBString) MSet(args ...driver.KVPair) error {
 }
 
 // SetNX sets the data if not existed.
-func (db *DBString) SetNX(key []byte, value []byte) (n int64, err error) {
+func (db *DBString) SetNX(ctx context.Context, key []byte, value []byte) (n int64, err error) {
 	if err = checkKeySize(key); err != nil {
 		return
 	}
@@ -245,7 +246,7 @@ func (db *DBString) SetNX(key []byte, value []byte) (n int64, err error) {
 }
 
 // SetEX sets the data with a TTL.
-func (db *DBString) SetEX(key []byte, duration int64, value []byte) error {
+func (db *DBString) SetEX(ctx context.Context, key []byte, duration int64, value []byte) error {
 	if err := checkKeySize(key); err != nil {
 		return err
 	} else if err := checkValueSize(value); err != nil {
@@ -267,8 +268,22 @@ func (db *DBString) SetEX(key []byte, duration int64, value []byte) error {
 	return t.Commit()
 }
 
+// SetNXEX set k v nx ex seconds
+// NX -- Only set the key if it does not already exist.
+// EX seconds -- Set the specified expire time, in seconds.
+func (db *DBString) SetNXEX(ctx context.Context, key []byte, duration int64, value []byte) error {
+	return nil
+}
+
+// SetXXEX set k v xx ex seconds
+// XX -- Only set the key if it already exists.
+// EX seconds -- Set the specified expire time, in seconds.
+func (db *DBString) SetXXEX(ctx context.Context, key []byte, duration int64, value []byte) error {
+	return nil
+}
+
 // Del deletes the data.
-func (db *DBString) Del(keys ...[]byte) (int64, error) {
+func (db *DBString) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 	if len(keys) == 0 {
 		return 0, nil
 	}
@@ -292,7 +307,7 @@ func (db *DBString) Del(keys ...[]byte) (int64, error) {
 }
 
 // Exists check data exists or not.
-func (db *DBString) Exists(key []byte) (int64, error) {
+func (db *DBString) Exists(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -310,29 +325,29 @@ func (db *DBString) Exists(key []byte) (int64, error) {
 }
 
 // Expire expires the data.
-func (db *DBString) Expire(key []byte, duration int64) (int64, error) {
+func (db *DBString) Expire(ctx context.Context, key []byte, duration int64) (int64, error) {
 	if duration <= 0 {
 		return 0, ErrExpireValue
 	}
 
-	return db.setExpireAt(key, time.Now().Unix()+duration)
+	return db.setExpireAt(ctx, key, time.Now().Unix()+duration)
 }
 
 // ExpireAt expires the data at when.
-func (db *DBString) ExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBString) ExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 	if when <= time.Now().Unix() {
 		return 0, ErrExpireValue
 	}
 
-	return db.setExpireAt(key, when)
+	return db.setExpireAt(ctx, key, when)
 }
 
-func (db *DBString) setExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBString) setExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
 
-	if exist, err := db.Exists(key); err != nil || exist == 0 {
+	if exist, err := db.Exists(ctx, key); err != nil || exist == 0 {
 		return 0, err
 	}
 
@@ -345,7 +360,7 @@ func (db *DBString) setExpireAt(key []byte, when int64) (int64, error) {
 }
 
 // TTL returns the TTL of the data.
-func (db *DBString) TTL(key []byte) (int64, error) {
+func (db *DBString) TTL(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return -1, err
 	}
@@ -354,7 +369,7 @@ func (db *DBString) TTL(key []byte) (int64, error) {
 }
 
 // Persist removes the TTL of the data.
-func (db *DBString) Persist(key []byte) (int64, error) {
+func (db *DBString) Persist(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -372,7 +387,7 @@ func (db *DBString) Persist(key []byte) (int64, error) {
 }
 
 // SetRange sets the data with new value from offset.
-func (db *DBString) SetRange(key []byte, offset int, value []byte) (int64, error) {
+func (db *DBString) SetRange(ctx context.Context, key []byte, offset int, value []byte) (int64, error) {
 	if len(value) == 0 {
 		return 0, nil
 	}
@@ -435,7 +450,7 @@ func getRange(start int, end int, valLen int) (int, int) {
 }
 
 // GetRange gets the range of the data.
-func (db *DBString) GetRange(key []byte, start int, end int) ([]byte, error) {
+func (db *DBString) GetRange(ctx context.Context, key []byte, start int, end int) ([]byte, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -458,8 +473,8 @@ func (db *DBString) GetRange(key []byte, start int, end int) ([]byte, error) {
 }
 
 // StrLen returns the length of the data.
-func (db *DBString) StrLen(key []byte) (int64, error) {
-	s, err := db.GetSlice(key)
+func (db *DBString) StrLen(ctx context.Context, key []byte) (int64, error) {
+	s, err := db.GetSlice(ctx, key)
 	if err != nil {
 		return 0, err
 	}
@@ -470,7 +485,7 @@ func (db *DBString) StrLen(key []byte) (int64, error) {
 }
 
 // Append appends the value to the data.
-func (db *DBString) Append(key []byte, value []byte) (int64, error) {
+func (db *DBString) Append(ctx context.Context, key []byte, value []byte) (int64, error) {
 	if len(value) == 0 {
 		return 0, nil
 	}

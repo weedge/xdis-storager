@@ -112,11 +112,11 @@ func (db *DBList) lGetMeta(it *openkv.Iterator, ek []byte) (headSeq int32, tailS
 	return
 }
 
-func (db *DBList) lSignalAsReady(key []byte) {
+func (db *DBList) lSignalAsReady(ctx context.Context, key []byte) {
 	db.lbKeys.signal(key)
 }
 
-func (db *DBList) lpush(key []byte, whereSeq int32, args ...[]byte) (int64, error) {
+func (db *DBList) lpush(ctx context.Context, key []byte, whereSeq int32, args ...[]byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -175,13 +175,13 @@ func (db *DBList) lpush(key []byte, whereSeq int32, args ...[]byte) (int64, erro
 	err = t.Commit()
 
 	if err == nil {
-		db.lSignalAsReady(key)
+		db.lSignalAsReady(ctx, key)
 	}
 
 	return int64(size) + int64(pushCnt), err
 }
 
-func (db *DBList) lpop(key []byte, whereSeq int32) ([]byte, error) {
+func (db *DBList) lpop(ctx context.Context, key []byte, whereSeq int32) ([]byte, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (db *DBList) lpop(key []byte, whereSeq int32) ([]byte, error) {
 	return value, err
 }
 
-func (db *DBList) ltrim2(key []byte, startP, stopP int64) (err error) {
+func (db *DBList) ltrim2(ctx context.Context, key []byte, startP, stopP int64) (err error) {
 	if err := checkKeySize(key); err != nil {
 		return err
 	}
@@ -286,7 +286,7 @@ func (db *DBList) ltrim2(key []byte, startP, stopP int64) (err error) {
 	return t.Commit()
 }
 
-func (db *DBList) ltrim(key []byte, trimSize, whereSeq int32) (int32, error) {
+func (db *DBList) ltrim(ctx context.Context, key []byte, trimSize, whereSeq int32) (int32, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -342,7 +342,7 @@ func (db *DBList) ltrim(key []byte, trimSize, whereSeq int32) (int32, error) {
 }
 
 // LIndex returns the value at index.
-func (db *DBList) LIndex(key []byte, index int32) ([]byte, error) {
+func (db *DBList) LIndex(ctx context.Context, key []byte, index int32) ([]byte, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -375,7 +375,7 @@ func (db *DBList) LIndex(key []byte, index int32) ([]byte, error) {
 }
 
 // LLen gets the length of the list.
-func (db *DBList) LLen(key []byte) (int64, error) {
+func (db *DBList) LLen(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -386,32 +386,32 @@ func (db *DBList) LLen(key []byte) (int64, error) {
 }
 
 // LPop pops the value.
-func (db *DBList) LPop(key []byte) ([]byte, error) {
-	return db.lpop(key, listHeadSeq)
+func (db *DBList) LPop(ctx context.Context, key []byte) ([]byte, error) {
+	return db.lpop(ctx, key, listHeadSeq)
 }
 
 // LTrim trims the value from start to stop.
-func (db *DBList) LTrim(key []byte, start, stop int64) error {
-	return db.ltrim2(key, start, stop)
+func (db *DBList) LTrim(ctx context.Context, key []byte, start, stop int64) error {
+	return db.ltrim2(ctx, key, start, stop)
 }
 
 // LTrimFront trims the value from top.
-func (db *DBList) LTrimFront(key []byte, trimSize int32) (int32, error) {
-	return db.ltrim(key, trimSize, listHeadSeq)
+func (db *DBList) LTrimFront(ctx context.Context, key []byte, trimSize int32) (int32, error) {
+	return db.ltrim(ctx, key, trimSize, listHeadSeq)
 }
 
 // LTrimBack trims the value from back.
-func (db *DBList) LTrimBack(key []byte, trimSize int32) (int32, error) {
-	return db.ltrim(key, trimSize, listTailSeq)
+func (db *DBList) LTrimBack(ctx context.Context, key []byte, trimSize int32) (int32, error) {
+	return db.ltrim(ctx, key, trimSize, listTailSeq)
 }
 
 // LPush push the value to the list.
-func (db *DBList) LPush(key []byte, args ...[]byte) (int64, error) {
-	return db.lpush(key, listHeadSeq, args...)
+func (db *DBList) LPush(ctx context.Context, key []byte, args ...[]byte) (int64, error) {
+	return db.lpush(ctx, key, listHeadSeq, args...)
 }
 
 // LSet sets the value at index.
-func (db *DBList) LSet(key []byte, index int32, value []byte) error {
+func (db *DBList) LSet(ctx context.Context, key []byte, index int32, value []byte) error {
 	if err := checkKeySize(key); err != nil {
 		return err
 	}
@@ -446,7 +446,7 @@ func (db *DBList) LSet(key []byte, index int32, value []byte) error {
 }
 
 // LRange gets the value of list at range.
-func (db *DBList) LRange(key []byte, start int32, stop int32) ([][]byte, error) {
+func (db *DBList) LRange(ctx context.Context, key []byte, start int32, stop int32) ([][]byte, error) {
 	if err := checkKeySize(key); err != nil {
 		return nil, err
 	}
@@ -505,26 +505,26 @@ func (db *DBList) LRange(key []byte, start int32, stop int32) ([][]byte, error) 
 }
 
 // RPop rpops the value.
-func (db *DBList) RPop(key []byte) ([]byte, error) {
-	return db.lpop(key, listTailSeq)
+func (db *DBList) RPop(ctx context.Context, key []byte) ([]byte, error) {
+	return db.lpop(ctx, key, listTailSeq)
 }
 
 // RPush rpushs the value .
-func (db *DBList) RPush(key []byte, args ...[]byte) (int64, error) {
-	return db.lpush(key, listTailSeq, args...)
+func (db *DBList) RPush(ctx context.Context, key []byte, args ...[]byte) (int64, error) {
+	return db.lpush(ctx, key, listTailSeq, args...)
 }
 
 // BLPop pops the list with block way.
-func (db *DBList) BLPop(keys [][]byte, timeout time.Duration) ([]interface{}, error) {
-	return db.lblockPop(keys, listHeadSeq, timeout)
+func (db *DBList) BLPop(ctx context.Context, keys [][]byte, timeout time.Duration) ([]interface{}, error) {
+	return db.lblockPop(ctx, keys, listHeadSeq, timeout)
 }
 
 // BRPop bpops the list with block way.
-func (db *DBList) BRPop(keys [][]byte, timeout time.Duration) ([]interface{}, error) {
-	return db.lblockPop(keys, listTailSeq, timeout)
+func (db *DBList) BRPop(ctx context.Context, keys [][]byte, timeout time.Duration) ([]interface{}, error) {
+	return db.lblockPop(ctx, keys, listTailSeq, timeout)
 }
 
-func (db *DBList) lblockPop(keys [][]byte, whereSeq int32, timeout time.Duration) ([]interface{}, error) {
+func (db *DBList) lblockPop(ctx context.Context, keys [][]byte, whereSeq int32, timeout time.Duration) ([]interface{}, error) {
 	for {
 		var ctx context.Context
 		var cancel context.CancelFunc
@@ -535,7 +535,7 @@ func (db *DBList) lblockPop(keys [][]byte, whereSeq int32, timeout time.Duration
 		}
 
 		for _, key := range keys {
-			v, err := db.lbKeys.popOrWait(db, key, whereSeq, cancel)
+			v, err := db.lbKeys.popOrWait(ctx, db, key, whereSeq, cancel)
 
 			if err != nil {
 				cancel()
@@ -559,7 +559,7 @@ func (db *DBList) lblockPop(keys [][]byte, whereSeq int32, timeout time.Duration
 }
 
 // Del clears multi lists.
-func (db *DBList) Del(keys ...[]byte) (int64, error) {
+func (db *DBList) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
@@ -578,13 +578,13 @@ func (db *DBList) Del(keys ...[]byte) (int64, error) {
 	return int64(len(keys)), err
 }
 
-func (db *DBList) lExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBList) lExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
 
-	if llen, err := db.LLen(key); err != nil || llen == 0 {
+	if llen, err := db.LLen(ctx, key); err != nil || llen == 0 {
 		return 0, err
 	}
 
@@ -597,25 +597,25 @@ func (db *DBList) lExpireAt(key []byte, when int64) (int64, error) {
 }
 
 // Expire expires the list.
-func (db *DBList) Expire(key []byte, duration int64) (int64, error) {
+func (db *DBList) Expire(ctx context.Context, key []byte, duration int64) (int64, error) {
 	if duration <= 0 {
 		return 0, ErrExpireValue
 	}
 
-	return db.lExpireAt(key, time.Now().Unix()+duration)
+	return db.lExpireAt(ctx, key, time.Now().Unix()+duration)
 }
 
 // ExpireAt expires the list at when.
-func (db *DBList) ExpireAt(key []byte, when int64) (int64, error) {
+func (db *DBList) ExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
 	if when <= time.Now().Unix() {
 		return 0, ErrExpireValue
 	}
 
-	return db.lExpireAt(key, when)
+	return db.lExpireAt(ctx, key, when)
 }
 
 // TTL gets the TTL of list.
-func (db *DBList) TTL(key []byte) (int64, error) {
+func (db *DBList) TTL(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return -1, err
 	}
@@ -624,7 +624,7 @@ func (db *DBList) TTL(key []byte) (int64, error) {
 }
 
 // Persist removes the TTL of list.
-func (db *DBList) Persist(key []byte) (int64, error) {
+func (db *DBList) Persist(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -643,7 +643,7 @@ func (db *DBList) Persist(key []byte) (int64, error) {
 }
 
 // Exists check list existed or not.
-func (db *DBList) Exists(key []byte) (int64, error) {
+func (db *DBList) Exists(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
