@@ -225,8 +225,9 @@ func (db *DBString) SetNX(ctx context.Context, key []byte, value []byte) (n int6
 	}
 
 	key = db.encodeStringKey(key)
-	t := db.batch
+	n = 1
 
+	t := db.batch
 	t.Lock()
 	defer t.Unlock()
 
