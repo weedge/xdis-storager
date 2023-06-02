@@ -17,7 +17,7 @@ type DBZSet struct {
 }
 
 func NewDBZSet(db *DB) *DBZSet {
-	batch := NewBatch(db.store, db.IKVStoreDB.NewWriteBatch(),
+	batch := NewBatch(db.store, db.IKV.NewWriteBatch(),
 		&dbBatchLocker{
 			l:      &sync.Mutex{},
 			wrLock: &db.store.wLock,
@@ -89,7 +89,7 @@ func (db *DBZSet) Del(keys ...[]byte) (int64, error) {
 
 func (db *DBZSet) zDelItem(t *Batch, key []byte, member []byte, skipDelScore bool) (int64, error) {
 	ek := db.zEncodeSetKey(key, member)
-	if v, err := db.IKVStoreDB.Get(ek); err != nil {
+	if v, err := db.IKV.Get(ek); err != nil {
 		return 0, err
 	} else if v == nil {
 		//not exists
@@ -115,7 +115,7 @@ func (db *DBZSet) zDelItem(t *Batch, key []byte, member []byte, skipDelScore boo
 func (db *DBZSet) zIncrSize(t *Batch, key []byte, delta int64) (int64, error) {
 	sk := db.zEncodeSizeKey(key)
 
-	size, err := Int64(db.IKVStoreDB.Get(sk))
+	size, err := Int64(db.IKV.Get(sk))
 	if err != nil {
 		return 0, err
 	}
@@ -139,7 +139,7 @@ func (db *DBZSet) zSetItem(t *Batch, key []byte, score int64, member []byte) (in
 	var exists int64
 	ek := db.zEncodeSetKey(key, member)
 
-	if v, err := db.IKVStoreDB.Get(ek); err != nil {
+	if v, err := db.IKV.Get(ek); err != nil {
 		return 0, err
 	} else if v != nil {
 		exists = 1
@@ -203,7 +203,7 @@ func (db *DBZSet) ZCard(key []byte) (int64, error) {
 	}
 
 	sk := db.zEncodeSizeKey(key)
-	return Int64(db.IKVStoreDB.Get(sk))
+	return Int64(db.IKV.Get(sk))
 }
 
 // ZScore gets the score of member.
@@ -215,7 +215,7 @@ func (db *DBZSet) ZScore(key []byte, member []byte) (int64, error) {
 	score := InvalidScore
 
 	k := db.zEncodeSetKey(key, member)
-	if v, err := db.IKVStoreDB.Get(k); err != nil {
+	if v, err := db.IKV.Get(k); err != nil {
 		return InvalidScore, err
 	} else if v == nil {
 		return InvalidScore, ErrScoreMiss
@@ -272,7 +272,7 @@ func (db *DBZSet) ZIncrBy(key []byte, delta int64, member []byte) (int64, error)
 	ek := db.zEncodeSetKey(key, member)
 
 	var oldScore int64
-	v, err := db.IKVStoreDB.Get(ek)
+	v, err := db.IKV.Get(ek)
 	if err != nil {
 		return InvalidScore, err
 	} else if v == nil {
@@ -312,7 +312,7 @@ func (db *DBZSet) ZCount(key []byte, min int64, max int64) (int64, error) {
 
 	rangeType := driver.RangeROpen
 
-	it := db.IKVStoreDB.RangeLimitIterator(minKey, maxKey, rangeType, 0, -1)
+	it := db.IKV.RangeLimitIterator(minKey, maxKey, rangeType, 0, -1)
 	var n int64
 	for ; it.Valid(); it.Next() {
 		n++
@@ -329,7 +329,7 @@ func (db *DBZSet) zrank(key []byte, member []byte, reverse bool) (int64, error) 
 
 	k := db.zEncodeSetKey(key, member)
 
-	it := db.IKVStoreDB.NewIterator()
+	it := db.IKV.NewIterator()
 	defer it.Close()
 
 	v := it.Find(k)
@@ -376,9 +376,9 @@ func (db *DBZSet) zIterator(key []byte, min int64, max int64, offset int, count 
 	maxKey := db.zEncodeStopScoreKey(key, max)
 
 	if !reverse {
-		return db.IKVStoreDB.RangeLimitIterator(minKey, maxKey, driver.RangeClose, offset, count)
+		return db.IKV.RangeLimitIterator(minKey, maxKey, driver.RangeClose, offset, count)
 	}
-	return db.IKVStoreDB.RevRangeLimitIterator(minKey, maxKey, driver.RangeClose, offset, count)
+	return db.IKV.RevRangeLimitIterator(minKey, maxKey, driver.RangeClose, offset, count)
 }
 
 func (db *DBZSet) zRange(key []byte, min int64, max int64, offset int, count int, reverse bool) ([]driver.ScorePair, error) {
@@ -800,7 +800,7 @@ func (db *DBZSet) ZRangeByLex(key []byte, min []byte, max []byte, rangeType driv
 		max = db.zEncodeSetKey(key, max)
 	}
 
-	it := db.IKVStoreDB.RangeLimitIterator(min, max, rangeType, offset, count)
+	it := db.IKV.RangeLimitIterator(min, max, rangeType, offset, count)
 	defer it.Close()
 
 	ay := make([][]byte, 0, 16)
@@ -830,7 +830,7 @@ func (db *DBZSet) ZRemRangeByLex(key []byte, min []byte, max []byte, rangeType d
 	t.Lock()
 	defer t.Unlock()
 
-	it := db.IKVStoreDB.RangeIterator(min, max, rangeType)
+	it := db.IKV.RangeIterator(min, max, rangeType)
 	defer it.Close()
 
 	var n int64
@@ -859,7 +859,7 @@ func (db *DBZSet) ZLexCount(key []byte, min []byte, max []byte, rangeType driver
 		max = db.zEncodeSetKey(key, max)
 	}
 
-	it := db.IKVStoreDB.RangeIterator(min, max, rangeType)
+	it := db.IKV.RangeIterator(min, max, rangeType)
 	defer it.Close()
 
 	var n int64
@@ -876,7 +876,7 @@ func (db *DBZSet) Exists(key []byte) (int64, error) {
 		return 0, err
 	}
 	sk := db.zEncodeSizeKey(key)
-	v, err := db.IKVStoreDB.Get(sk)
+	v, err := db.IKV.Get(sk)
 	if v != nil && err == nil {
 		return 1, nil
 	}

@@ -13,7 +13,7 @@ type DBSet struct {
 }
 
 func NewDBSet(db *DB) *DBSet {
-	batch := NewBatch(db.store, db.IKVStoreDB.NewWriteBatch(),
+	batch := NewBatch(db.store, db.IKV.NewWriteBatch(),
 		&dbBatchLocker{
 			l:      &sync.Mutex{},
 			wrLock: &db.store.wLock,
@@ -34,7 +34,7 @@ func (db *DBSet) delete(t *Batch, key []byte) (num int64, err error) {
 	start := db.sEncodeStartKey(key)
 	stop := db.sEncodeStopKey(key)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
+	it := db.IKV.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	for ; it.Valid(); it.Next() {
 		t.Delete(it.RawKey())
 		num++
@@ -51,7 +51,7 @@ func (db *DBSet) sIncrSize(key []byte, delta int64) (int64, error) {
 
 	var err error
 	var size int64
-	if size, err = Int64(db.IKVStoreDB.Get(sk)); err != nil {
+	if size, err = Int64(db.IKV.Get(sk)); err != nil {
 		return 0, err
 	}
 
@@ -99,7 +99,7 @@ func (db *DBSet) SAdd(key []byte, args ...[]byte) (int64, error) {
 
 		ek = db.sEncodeSetKey(key, args[i])
 
-		if v, err := db.IKVStoreDB.Get(ek); err != nil {
+		if v, err := db.IKV.Get(ek); err != nil {
 			return 0, err
 		} else if v == nil {
 			num++
@@ -125,7 +125,7 @@ func (db *DBSet) SCard(key []byte) (int64, error) {
 
 	sk := db.sEncodeSizeKey(key)
 
-	return Int64(db.IKVStoreDB.Get(sk))
+	return Int64(db.IKV.Get(sk))
 }
 
 func (db *DBSet) sDiffGeneric(keys ...[]byte) ([][]byte, error) {
@@ -190,7 +190,7 @@ func (db *DBSet) SKeyExists(key []byte) (int64, error) {
 		return 0, err
 	}
 	sk := db.sEncodeSizeKey(key)
-	v, err := db.IKVStoreDB.Get(sk)
+	v, err := db.IKV.Get(sk)
 	if v != nil && err == nil {
 		return 1, nil
 	}
@@ -269,7 +269,7 @@ func (db *DBSet) SIsMember(key []byte, member []byte) (int64, error) {
 	ek := db.sEncodeSetKey(key, member)
 
 	var n int64 = 1
-	if v, err := db.IKVStoreDB.Get(ek); err != nil {
+	if v, err := db.IKV.Get(ek); err != nil {
 		return 0, err
 	} else if v == nil {
 		n = 0
@@ -288,7 +288,7 @@ func (db *DBSet) SMembers(key []byte) ([][]byte, error) {
 
 	v := make([][]byte, 0, 16)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
+	it := db.IKV.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	defer it.Close()
 
 	for ; it.Valid(); it.Next() {
@@ -313,7 +313,7 @@ func (db *DBSet) SRem(key []byte, args ...[]byte) (int64, error) {
 	var v []byte
 	var err error
 
-	it := db.IKVStoreDB.NewIterator()
+	it := db.IKV.NewIterator()
 	defer it.Close()
 
 	var num int64
@@ -420,7 +420,7 @@ func (db *DBSet) sStoreGeneric(dstKey []byte, optType byte, keys ...[]byte) (int
 
 		ek = db.sEncodeSetKey(dstKey, m)
 
-		if _, err := db.IKVStoreDB.Get(ek); err != nil {
+		if _, err := db.IKV.Get(ek); err != nil {
 			return 0, err
 		}
 
@@ -462,7 +462,7 @@ func (db *DBSet) Exists(key []byte) (int64, error) {
 		return 0, err
 	}
 	sk := db.sEncodeSizeKey(key)
-	v, err := db.IKVStoreDB.Get(sk)
+	v, err := db.IKV.Get(sk)
 	if v != nil && err == nil {
 		return 1, nil
 	}

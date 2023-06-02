@@ -15,7 +15,7 @@ type DBString struct {
 }
 
 func NewDBString(db *DB) *DBString {
-	batch := NewBatch(db.store, db.IKVStoreDB.NewWriteBatch(),
+	batch := NewBatch(db.store, db.IKV.NewWriteBatch(),
 		&dbBatchLocker{
 			l:      &sync.Mutex{},
 			wrLock: &db.store.wLock,
@@ -73,7 +73,7 @@ func (db *DBString) Get(key []byte) ([]byte, error) {
 
 	key = db.encodeStringKey(key)
 
-	return db.IKVStoreDB.Get(key)
+	return db.IKV.Get(key)
 }
 
 // GetSlice gets the slice of the data to adapt leveldb slice
@@ -84,7 +84,7 @@ func (db *DBString) GetSlice(key []byte) (openkvDriver.ISlice, error) {
 
 	key = db.encodeStringKey(key)
 
-	return db.IKVStoreDB.GetSlice(key)
+	return db.IKV.GetSlice(key)
 }
 
 // GetSet gets the value and sets new value.
@@ -103,7 +103,7 @@ func (db *DBString) GetSet(key []byte, value []byte) ([]byte, error) {
 	t.Lock()
 	defer t.Unlock()
 
-	oldValue, err := db.IKVStoreDB.Get(key)
+	oldValue, err := db.IKV.Get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (db *DBString) incr(key []byte, delta int64) (int64, error) {
 	defer t.Unlock()
 
 	var n int64
-	n, err = StrInt64(db.IKVStoreDB.Get(key))
+	n, err = StrInt64(db.IKV.Get(key))
 	if err != nil {
 		return 0, err
 	}
@@ -166,7 +166,7 @@ func (db *DBString) incr(key []byte, delta int64) (int64, error) {
 func (db *DBString) MGet(keys ...[]byte) ([][]byte, error) {
 	values := make([][]byte, len(keys))
 
-	it := db.IKVStoreDB.NewIterator()
+	it := db.IKV.NewIterator()
 	defer it.Close()
 
 	for i := range keys {
@@ -229,7 +229,7 @@ func (db *DBString) SetNX(key []byte, value []byte) (n int64, err error) {
 	t.Lock()
 	defer t.Unlock()
 
-	if v, err := db.IKVStoreDB.Get(key); err != nil {
+	if v, err := db.IKV.Get(key); err != nil {
 		return 0, err
 	} else if v != nil {
 		return 0, nil
@@ -301,7 +301,7 @@ func (db *DBString) Exists(key []byte) (int64, error) {
 	key = db.encodeStringKey(key)
 
 	var v []byte
-	v, err = db.IKVStoreDB.Get(key)
+	v, err = db.IKV.Get(key)
 	if v != nil && err == nil {
 		return 1, nil
 	}
@@ -390,7 +390,7 @@ func (db *DBString) SetRange(key []byte, offset int, value []byte) (int64, error
 	t.Lock()
 	defer t.Unlock()
 
-	oldValue, err := db.IKVStoreDB.Get(key)
+	oldValue, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
 	}
@@ -441,7 +441,7 @@ func (db *DBString) GetRange(key []byte, start int, end int) ([]byte, error) {
 	}
 	key = db.encodeStringKey(key)
 
-	value, err := db.IKVStoreDB.Get(key)
+	value, err := db.IKV.Get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +485,7 @@ func (db *DBString) Append(key []byte, value []byte) (int64, error) {
 	t.Lock()
 	defer t.Unlock()
 
-	oldValue, err := db.IKVStoreDB.Get(key)
+	oldValue, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
 	}

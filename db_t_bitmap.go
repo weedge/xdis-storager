@@ -14,7 +14,7 @@ type DBBitmap struct {
 }
 
 func NewDBBitmap(db *DB) *DBBitmap {
-	batch := NewBatch(db.store, db.IKVStoreDB.NewWriteBatch(),
+	batch := NewBatch(db.store, db.IKV.NewWriteBatch(),
 		&dbBatchLocker{
 			l:      &sync.Mutex{},
 			wrLock: &db.store.wLock,
@@ -45,7 +45,7 @@ func (db *DBBitmap) BitOP(op string, destKey []byte, srcKeys ...[]byte) (int64, 
 
 	key := db.encodeBitmapKey(srcKeys[0])
 
-	value, err := db.IKVStoreDB.Get(key)
+	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
 	}
@@ -61,7 +61,7 @@ func (db *DBBitmap) BitOP(op string, destKey []byte, srcKeys ...[]byte) (int64, 
 			}
 
 			key = db.encodeBitmapKey(srcKeys[j])
-			ovalue, err := db.IKVStoreDB.Get(key)
+			ovalue, err := db.IKV.Get(key)
 			if err != nil {
 				return 0, err
 			}
@@ -138,7 +138,7 @@ func (db *DBBitmap) BitCount(key []byte, start int, end int) (int64, error) {
 	}
 
 	key = db.encodeBitmapKey(key)
-	value, err := db.IKVStoreDB.Get(key)
+	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
 	}
@@ -176,7 +176,7 @@ func (db *DBBitmap) BitPos(key []byte, on int, start int, end int) (int64, error
 	}
 
 	key = db.encodeBitmapKey(key)
-	value, err := db.IKVStoreDB.Get(key)
+	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
 	}
@@ -215,7 +215,7 @@ func (db *DBBitmap) SetBit(key []byte, offset int, on int) (int64, error) {
 	defer t.Unlock()
 
 	key = db.encodeBitmapKey(key)
-	value, err := db.IKVStoreDB.Get(key)
+	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
 	}
@@ -255,7 +255,7 @@ func (db *DBBitmap) GetBit(key []byte, offset int) (int64, error) {
 
 	key = db.encodeBitmapKey(key)
 
-	value, err := db.IKVStoreDB.Get(key)
+	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
 	}
@@ -309,7 +309,7 @@ func (db *DBBitmap) Exists(key []byte) (int64, error) {
 	key = db.encodeBitmapKey(key)
 
 	var v []byte
-	v, err = db.IKVStoreDB.Get(key)
+	v, err = db.IKV.Get(key)
 	if v != nil && err == nil {
 		return 1, nil
 	}

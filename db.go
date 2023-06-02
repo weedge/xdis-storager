@@ -16,8 +16,8 @@ type DB struct {
 	index int
 	// database index to varint buffer
 	indexVarBuf []byte
-	// IKVStoreDB impl
-	kvDriver.IKVStoreDB
+	// IKV impl
+	kvDriver.IKV
 
 	string *DBString
 	list   *DBList
@@ -32,7 +32,7 @@ type DB struct {
 func NewDB(store *Storager, idx int) *DB {
 	db := &DB{store: store}
 	db.SetIndex(idx)
-	db.IKVStoreDB = store.odb
+	db.IKV = store.odb
 
 	db.string = NewDBString(db)
 	db.list = NewDBList(db)
@@ -66,11 +66,11 @@ func (m *DB) DBBitmap() driver.IBitmapCmd {
 }
 
 func (m *DB) Close() (err error) {
-	if utils.IsNil(m.IKVStoreDB) {
+	if utils.IsNil(m.IKV) {
 		return
 	}
 
-	return m.IKVStoreDB.Close()
+	return m.IKV.Close()
 }
 
 // Index gets the index of database.

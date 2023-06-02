@@ -71,7 +71,7 @@ func (c *TTLChecker) check() {
 	minKey := c.db.expEncodeTimeKey(NoneType, nil, 0)
 	maxKey := c.db.expEncodeTimeKey(maxDataType, nil, nc)
 
-	it := c.db.IKVStoreDB.RangeLimitIterator(minKey, maxKey, driver.RangeROpen, 0, -1)
+	it := c.db.IKV.RangeLimitIterator(minKey, maxKey, driver.RangeROpen, 0, -1)
 	for ; it.Valid(); it.Next() {
 		tk := it.RawKey()
 		mk := it.RawValue()
@@ -94,7 +94,7 @@ func (c *TTLChecker) check() {
 		}
 
 		t.Lock()
-		if exp, err := Int64(c.db.IKVStoreDB.Get(mk)); err == nil {
+		if exp, err := Int64(c.db.IKV.Get(mk)); err == nil {
 			// check expire again
 			if exp <= now {
 				cb(t, k)

@@ -6,7 +6,7 @@ import (
 	"github.com/weedge/xdis-storager/openkv"
 )
 
-type IKVStoreDB interface {
+type IKV interface {
 	Get(key []byte) ([]byte, error)
 	GetSlice(key []byte) (openkvDriver.ISlice, error)
 

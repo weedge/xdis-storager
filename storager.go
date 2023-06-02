@@ -177,7 +177,7 @@ func (m *Storager) checkTTL() {
 	}, nil, os.Stderr)
 }
 
-// FlushAll will clear all data and replication logs
+// FlushAll will clear all data
 func (m *Storager) FlushAll() error {
 	m.wLock.Lock()
 	defer m.wLock.Unlock()

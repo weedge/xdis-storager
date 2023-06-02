@@ -11,7 +11,7 @@ import (
 )
 
 // DB wrap driver.IDB interface op
-// impl IKVStoreDB
+// impl IKV
 type DB struct {
 	// store common conf
 	opts *config.StorgerOptions

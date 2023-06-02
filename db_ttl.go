@@ -4,7 +4,7 @@ import "time"
 
 func (db *DB) rmExpire(t *Batch, dataType byte, key []byte) (int64, error) {
 	mk := db.expEncodeMetaKey(dataType, key)
-	v, err := db.IKVStoreDB.Get(mk)
+	v, err := db.IKV.Get(mk)
 	if err != nil {
 		return 0, err
 	} else if v == nil {
@@ -25,7 +25,7 @@ func (db *DB) rmExpire(t *Batch, dataType byte, key []byte) (int64, error) {
 func (db *DB) ttl(dataType byte, key []byte) (t int64, err error) {
 	mk := db.expEncodeMetaKey(dataType, key)
 
-	if t, err = Int64(db.IKVStoreDB.Get(mk)); err != nil || t == 0 {
+	if t, err = Int64(db.IKV.Get(mk)); err != nil || t == 0 {
 		t = -1
 	} else {
 		t -= time.Now().Unix()

@@ -34,7 +34,7 @@ type DBList struct {
 }
 
 func NewDBList(db *DB) *DBList {
-	batch := NewBatch(db.store, db.IKVStoreDB.NewWriteBatch(),
+	batch := NewBatch(db.store, db.IKV.NewWriteBatch(),
 		&dbBatchLocker{
 			l:      &sync.Mutex{},
 			wrLock: &db.store.wLock,
@@ -44,7 +44,7 @@ func NewDBList(db *DB) *DBList {
 }
 
 func (db *DBList) delete(t *Batch, key []byte) (num int64, err error) {
-	it := db.IKVStoreDB.NewIterator()
+	it := db.IKV.NewIterator()
 	defer it.Close()
 
 	mk := db.lEncodeMetaKey(key)
@@ -95,7 +95,7 @@ func (db *DBList) lGetMeta(it *openkv.Iterator, ek []byte) (headSeq int32, tailS
 	if it != nil {
 		v = it.Find(ek)
 	} else {
-		v, err = db.IKVStoreDB.Get(ek)
+		v, err = db.IKV.Get(ek)
 	}
 	if err != nil {
 		return
@@ -211,7 +211,7 @@ func (db *DBList) lpop(key []byte, whereSeq int32) ([]byte, error) {
 	}
 
 	itemKey := db.lEncodeListKey(key, seq)
-	value, err = db.IKVStoreDB.Get(itemKey)
+	value, err = db.IKV.Get(itemKey)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +354,7 @@ func (db *DBList) LIndex(key []byte, index int32) ([]byte, error) {
 
 	metaKey := db.lEncodeMetaKey(key)
 
-	it := db.IKVStoreDB.NewIterator()
+	it := db.IKV.NewIterator()
 	defer it.Close()
 
 	headSeq, tailSeq, _, err = db.lGetMeta(it, metaKey)
@@ -457,7 +457,7 @@ func (db *DBList) LRange(key []byte, start int32, stop int32) ([][]byte, error) 
 
 	metaKey := db.lEncodeMetaKey(key)
 
-	it := db.IKVStoreDB.NewIterator()
+	it := db.IKV.NewIterator()
 	defer it.Close()
 
 	if headSeq, _, llen, err = db.lGetMeta(it, metaKey); err != nil {
@@ -648,7 +648,7 @@ func (db *DBList) Exists(key []byte) (int64, error) {
 		return 0, err
 	}
 	sk := db.lEncodeMetaKey(key)
-	v, err := db.IKVStoreDB.Get(sk)
+	v, err := db.IKV.Get(sk)
 	if v != nil && err == nil {
 		return 1, nil
 	}

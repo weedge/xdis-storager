@@ -14,7 +14,7 @@ type DBHash struct {
 }
 
 func NewDBHash(db *DB) *DBHash {
-	batch := NewBatch(db.store, db.IKVStoreDB.NewWriteBatch(),
+	batch := NewBatch(db.store, db.IKV.NewWriteBatch(),
 		&dbBatchLocker{
 			l:      &sync.Mutex{},
 			wrLock: &db.store.wLock,
@@ -36,7 +36,7 @@ func (db *DBHash) delete(t *Batch, key []byte) (num int64, err error) {
 	start := db.hEncodeStartKey(key)
 	stop := db.hEncodeStopKey(key)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
+	it := db.IKV.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	for ; it.Valid(); it.Next() {
 		t.Delete(it.Key())
 		num++
@@ -72,7 +72,7 @@ func (db *DBHash) hSetItem(key []byte, field []byte, value []byte) (int64, error
 	ek := db.hEncodeHashKey(key, field)
 
 	var n int64 = 1
-	if v, _ := db.IKVStoreDB.Get(ek); v != nil {
+	if v, _ := db.IKV.Get(ek); v != nil {
 		n = 0
 	} else {
 		if _, err := db.hIncrSize(key, 1); err != nil {
@@ -90,7 +90,7 @@ func (db *DBHash) hIncrSize(key []byte, delta int64) (int64, error) {
 
 	var err error
 	var size int64
-	if size, err = Int64(db.IKVStoreDB.Get(sk)); err != nil {
+	if size, err = Int64(db.IKV.Get(sk)); err != nil {
 		return 0, err
 	}
 
@@ -112,7 +112,7 @@ func (db *DBHash) HLen(key []byte) (int64, error) {
 		return 0, err
 	}
 
-	return Int64(db.IKVStoreDB.Get(db.hEncodeSizeKey(key)))
+	return Int64(db.IKV.Get(db.hEncodeSizeKey(key)))
 }
 
 // uHSet sets the field with value of key.
@@ -142,7 +142,7 @@ func (db *DBHash) HGet(key []byte, field []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return db.IKVStoreDB.Get(db.hEncodeHashKey(key, field))
+	return db.IKV.Get(db.hEncodeHashKey(key, field))
 }
 
 // HMset sets multi field-values.
@@ -163,7 +163,7 @@ func (db *DBHash) HMset(key []byte, args ...driver.FVPair) error {
 
 		ek = db.hEncodeHashKey(key, args[i].Field)
 
-		if v, err := db.IKVStoreDB.Get(ek); err != nil {
+		if v, err := db.IKV.Get(ek); err != nil {
 			return err
 		} else if v == nil {
 			num++
@@ -185,7 +185,7 @@ func (db *DBHash) HMset(key []byte, args ...driver.FVPair) error {
 func (db *DBHash) HMget(key []byte, args ...[]byte) ([][]byte, error) {
 	var ek []byte
 
-	it := db.IKVStoreDB.NewIterator()
+	it := db.IKV.NewIterator()
 	defer it.Close()
 
 	r := make([][]byte, len(args))
@@ -213,7 +213,7 @@ func (db *DBHash) HDel(key []byte, args ...[]byte) (int64, error) {
 	t.Lock()
 	defer t.Unlock()
 
-	it := db.IKVStoreDB.NewIterator()
+	it := db.IKV.NewIterator()
 	defer it.Close()
 
 	var num int64
@@ -258,7 +258,7 @@ func (db *DBHash) HIncrBy(key []byte, field []byte, delta int64) (int64, error) 
 	ek = db.hEncodeHashKey(key, field)
 
 	var n int64
-	if n, err = StrInt64(db.IKVStoreDB.Get(ek)); err != nil {
+	if n, err = StrInt64(db.IKV.Get(ek)); err != nil {
 		return 0, err
 	}
 
@@ -285,7 +285,7 @@ func (db *DBHash) HGetAll(key []byte) ([]driver.FVPair, error) {
 
 	v := make([]driver.FVPair, 0, 16)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
+	it := db.IKV.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	defer it.Close()
 
 	for ; it.Valid(); it.Next() {
@@ -311,7 +311,7 @@ func (db *DBHash) HKeys(key []byte) ([][]byte, error) {
 
 	v := make([][]byte, 0, 16)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
+	it := db.IKV.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	defer it.Close()
 
 	for ; it.Valid(); it.Next() {
@@ -336,7 +336,7 @@ func (db *DBHash) HValues(key []byte) ([][]byte, error) {
 
 	v := make([][]byte, 0, 16)
 
-	it := db.IKVStoreDB.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
+	it := db.IKV.RangeLimitIterator(start, stop, driver.RangeROpen, 0, -1)
 	defer it.Close()
 
 	for ; it.Valid(); it.Next() {
@@ -420,7 +420,7 @@ func (db *DBHash) Exists(key []byte) (int64, error) {
 		return 0, err
 	}
 	sk := db.hEncodeSizeKey(key)
-	v, err := db.IKVStoreDB.Get(sk)
+	v, err := db.IKV.Get(sk)
 	if v != nil && err == nil {
 		return 1, nil
 	}

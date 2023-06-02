@@ -81,9 +81,9 @@ func (db *DB) buildScanIterator(minKey []byte, maxKey []byte, inclusive bool, re
 
 	var it *openkv.RangeLimitIterator
 	if !reverse {
-		it = db.IKVStoreDB.RangeIterator(minKey, maxKey, tp)
+		it = db.IKV.RangeIterator(minKey, maxKey, tp)
 	} else {
-		it = db.IKVStoreDB.RevRangeIterator(minKey, maxKey, tp)
+		it = db.IKV.RevRangeIterator(minKey, maxKey, tp)
 	}
 
 	return it
