@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/weedge/pkg/driver"
+	"github.com/weedge/pkg/utils"
 )
 
 type DBHash struct {
@@ -259,7 +260,7 @@ func (db *DBHash) HIncrBy(ctx context.Context, key []byte, field []byte, delta i
 	ek = db.hEncodeHashKey(key, field)
 
 	var n int64
-	if n, err = StrInt64(db.IKV.Get(ek)); err != nil {
+	if n, err = utils.StrInt64(db.IKV.Get(ek)); err != nil {
 		return 0, err
 	}
 

@@ -686,10 +686,10 @@ func (db *DBZSet) ZUnionStore(ctx context.Context, destKey []byte, srcKeys [][]b
 			return 0, err
 		}
 		for _, pair := range scorePairs {
-			if score, ok := destMap[Bytes2String(pair.Member)]; !ok {
-				destMap[Bytes2String(pair.Member)] = pair.Score * weights[i]
+			if score, ok := destMap[utils.Bytes2String(pair.Member)]; !ok {
+				destMap[utils.Bytes2String(pair.Member)] = pair.Score * weights[i]
 			} else {
-				destMap[Bytes2String(pair.Member)] = aggregateFunc(score, pair.Score*weights[i])
+				destMap[utils.Bytes2String(pair.Member)] = aggregateFunc(score, pair.Score*weights[i])
 			}
 		}
 	}
@@ -746,7 +746,7 @@ func (db *DBZSet) ZInterStore(ctx context.Context, destKey []byte, srcKeys [][]b
 		return 0, err
 	}
 	for _, pair := range scorePairs {
-		destMap[Bytes2String(pair.Member)] = pair.Score * weights[0]
+		destMap[utils.Bytes2String(pair.Member)] = pair.Score * weights[0]
 	}
 
 	for i, key := range srcKeys[1:] {
@@ -756,8 +756,8 @@ func (db *DBZSet) ZInterStore(ctx context.Context, destKey []byte, srcKeys [][]b
 		}
 		tmpMap := map[string]int64{}
 		for _, pair := range scorePairs {
-			if score, ok := destMap[Bytes2String(pair.Member)]; ok {
-				tmpMap[Bytes2String(pair.Member)] = aggregateFunc(score, pair.Score*weights[i+1])
+			if score, ok := destMap[utils.Bytes2String(pair.Member)]; ok {
+				tmpMap[utils.Bytes2String(pair.Member)] = aggregateFunc(score, pair.Score*weights[i+1])
 			}
 		}
 		destMap = tmpMap

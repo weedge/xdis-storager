@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/weedge/pkg/driver"
+	"github.com/weedge/pkg/utils"
 )
 
 type DBSet struct {
@@ -138,7 +139,7 @@ func (db *DBSet) sDiffGeneric(ctx context.Context, keys ...[]byte) ([][]byte, er
 	}
 
 	for _, m := range members {
-		destMap[Bytes2String(m)] = true
+		destMap[utils.Bytes2String(m)] = true
 	}
 
 	for _, k := range keys[1:] {
@@ -148,10 +149,10 @@ func (db *DBSet) sDiffGeneric(ctx context.Context, keys ...[]byte) ([][]byte, er
 		}
 
 		for _, m := range members {
-			if _, ok := destMap[Bytes2String(m)]; !ok {
+			if _, ok := destMap[utils.Bytes2String(m)]; !ok {
 				continue
 			} else if ok {
-				delete(destMap, Bytes2String(m))
+				delete(destMap, utils.Bytes2String(m))
 			}
 		}
 		// O - A = O, O is zero set.
@@ -207,7 +208,7 @@ func (db *DBSet) sInterGeneric(ctx context.Context, keys ...[]byte) ([][]byte, e
 	}
 
 	for _, m := range members {
-		destMap[Bytes2String(m)] = true
+		destMap[utils.Bytes2String(m)] = true
 	}
 
 	for _, key := range keys[1:] {
@@ -227,8 +228,8 @@ func (db *DBSet) sInterGeneric(ctx context.Context, keys ...[]byte) ([][]byte, e
 			if err := checkKeySize(member); err != nil {
 				return nil, err
 			}
-			if _, ok := destMap[Bytes2String(member)]; ok {
-				tempMap[Bytes2String(member)] = true //mark this item as selected
+			if _, ok := destMap[utils.Bytes2String(member)]; ok {
+				tempMap[utils.Bytes2String(member)] = true //mark this item as selected
 			}
 		}
 		destMap = tempMap //reduce the size of the result set
@@ -357,7 +358,7 @@ func (db *DBSet) sUnionGeneric(ctx context.Context, keys ...[]byte) ([][]byte, e
 		}
 
 		for _, member := range members {
-			dstMap[Bytes2String(member)] = true
+			dstMap[utils.Bytes2String(member)] = true
 		}
 	}
 

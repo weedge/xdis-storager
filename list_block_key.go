@@ -4,6 +4,8 @@ import (
 	"container/list"
 	"context"
 	"sync"
+
+	"github.com/weedge/pkg/utils"
 )
 
 type lBlockKeys struct {
@@ -24,7 +26,7 @@ func (l *lBlockKeys) signal(key []byte) {
 	l.Lock()
 	defer l.Unlock()
 
-	s := Bytes2String(key)
+	s := utils.Bytes2String(key)
 	fns, ok := l.keys[s]
 	if !ok {
 		return
@@ -47,7 +49,7 @@ func (l *lBlockKeys) popOrWait(ctx context.Context, db *DBList, key []byte, wher
 
 	l.Lock()
 
-	s := Bytes2String(key)
+	s := utils.Bytes2String(key)
 	chs, ok := l.keys[s]
 	if !ok {
 		chs = list.New()

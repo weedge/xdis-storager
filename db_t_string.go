@@ -8,6 +8,7 @@ import (
 
 	"github.com/weedge/pkg/driver"
 	openkvDriver "github.com/weedge/pkg/driver/openkv"
+	"github.com/weedge/pkg/utils"
 )
 
 type DBString struct {
@@ -150,7 +151,7 @@ func (db *DBString) incr(ctx context.Context, key []byte, delta int64) (int64, e
 	defer t.Unlock()
 
 	var n int64
-	n, err = StrInt64(db.IKV.Get(key))
+	n, err = utils.StrInt64(db.IKV.Get(key))
 	if err != nil {
 		return 0, err
 	}
