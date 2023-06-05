@@ -10,4 +10,4 @@ require (
 
 require golang.org/x/sys v0.8.0 // indirect
 
-replace github.com/weedge/pkg => ../pkg
+//replace github.com/weedge/pkg => ../pkg

@@ -22,6 +22,7 @@ func NewDBSet(db *DB) *DBSet {
 		})
 	return &DBSet{DB: db, batch: batch}
 }
+
 func checkSetKMSize(ctx context.Context, key []byte, member []byte) error {
 	if len(key) > MaxKeySize || len(key) == 0 {
 		return ErrKeySize
@@ -87,6 +88,13 @@ func (db *DBSet) sExpireAt(ctx context.Context, key []byte, when int64) (int64, 
 
 // SAdd adds the value to the set.
 func (db *DBSet) SAdd(ctx context.Context, key []byte, args ...[]byte) (int64, error) {
+	if len(args) == 0 {
+		return 0, nil
+	}
+	if err := checkKeySize(key); err != nil {
+		return 0, err
+	}
+
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()

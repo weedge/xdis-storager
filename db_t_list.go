@@ -336,9 +336,9 @@ func (db *DBList) ltrim(ctx context.Context, key []byte, trimSize, whereSeq int3
 		t.Delete(itemKey)
 	}
 
-	size, err = db.lSetMeta(metaKey, headSeq, tailSeq)
-	if err != nil {
-		return 0, err
+	size,err = db.lSetMeta(metaKey, headSeq, tailSeq)
+	if err!=nil{
+		return 0,err
 	}
 	if size == 0 {
 		db.rmExpire(t, ListType, key)
