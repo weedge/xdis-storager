@@ -285,6 +285,9 @@ func (db *DBBitmap) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 
 	codedKeys := make([][]byte, len(keys))
 	for i, k := range keys {
+		if err := checkKeySize(k); err != nil {
+			return 0, err
+		}
 		codedKeys[i] = db.encodeBitmapKey(k)
 	}
 

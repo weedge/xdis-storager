@@ -153,8 +153,6 @@ func (db *DBHash) HMset(ctx context.Context, key []byte, args ...driver.FVPair) 
 	t.Lock()
 	defer t.Unlock()
 
-	var err error
-	var ek []byte
 	var num int64
 	for i := 0; i < len(args); i++ {
 		if err := checkHashKFSize(ctx, key, args[i].Field); err != nil {
@@ -163,7 +161,7 @@ func (db *DBHash) HMset(ctx context.Context, key []byte, args ...driver.FVPair) 
 			return err
 		}
 
-		ek = db.hEncodeHashKey(key, args[i].Field)
+		ek := db.hEncodeHashKey(key, args[i].Field)
 
 		if v, err := db.IKV.Get(ek); err != nil {
 			return err
@@ -174,12 +172,11 @@ func (db *DBHash) HMset(ctx context.Context, key []byte, args ...driver.FVPair) 
 		t.Put(ek, args[i].Value)
 	}
 
-	if _, err = db.hIncrSize(ctx, key, num); err != nil {
+	if _, err := db.hIncrSize(ctx, key, num); err != nil {
 		return err
 	}
 
-	//todo add binglog
-	err = t.Commit()
+	err := t.Commit()
 	return err
 }
 
@@ -447,23 +444,4 @@ func (db *DBHash) Clear(ctx context.Context, key []byte) (int64, error) {
 
 	err = t.Commit()
 	return num, err
-}
-
-// Mclear cleans multi data.
-func (db *DBHash) Mclear(keys ...[]byte) (int64, error) {
-	t := db.batch
-	t.Lock()
-	defer t.Unlock()
-
-	for _, key := range keys {
-		if err := checkKeySize(key); err != nil {
-			return 0, err
-		}
-
-		db.delete(t, key)
-		db.rmExpire(t, HashType, key)
-	}
-
-	err := t.Commit()
-	return int64(len(keys)), err
 }

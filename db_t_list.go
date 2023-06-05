@@ -3,7 +3,7 @@ package storager
 import (
 	"context"
 	"encoding/binary"
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
@@ -70,12 +70,12 @@ func (db *DBList) delete(t *Batch, key []byte) (num int64, err error) {
 	return num, nil
 }
 
-func (db *DBList) lSetMeta(ek []byte, headSeq int32, tailSeq int32) int32 {
+func (db *DBList) lSetMeta(ek []byte, headSeq int32, tailSeq int32) (int32, error) {
 	t := db.batch
 
 	size := tailSeq - headSeq + 1
 	if size < 0 {
-		log.Panicf("invalid meta sequence range [%d, %d]", headSeq, tailSeq)
+		return 0, fmt.Errorf("invalid meta sequence range [%d, %d]", headSeq, tailSeq)
 	} else if size == 0 {
 		t.Delete(ek)
 	} else {
@@ -87,7 +87,7 @@ func (db *DBList) lSetMeta(ek []byte, headSeq int32, tailSeq int32) int32 {
 		t.Put(ek, buf)
 	}
 
-	return size
+	return size, nil
 }
 
 func (db *DBList) lGetMeta(it *openkv.Iterator, ek []byte) (headSeq int32, tailSeq int32, size int32, err error) {
@@ -99,16 +99,17 @@ func (db *DBList) lGetMeta(it *openkv.Iterator, ek []byte) (headSeq int32, tailS
 	}
 	if err != nil {
 		return
-	} else if v == nil {
+	}
+	if v == nil {
 		headSeq = listInitialSeq
 		tailSeq = listInitialSeq
 		size = 0
 		return
-	} else {
-		headSeq = int32(binary.LittleEndian.Uint32(v[0:4]))
-		tailSeq = int32(binary.LittleEndian.Uint32(v[4:8]))
-		size = tailSeq - headSeq + 1
 	}
+
+	headSeq = int32(binary.LittleEndian.Uint32(v[0:4]))
+	tailSeq = int32(binary.LittleEndian.Uint32(v[4:8]))
+	size = tailSeq - headSeq + 1
 	return
 }
 
@@ -223,7 +224,10 @@ func (db *DBList) lpop(ctx context.Context, key []byte, whereSeq int32) ([]byte,
 	}
 
 	t.Delete(itemKey)
-	size = db.lSetMeta(metaKey, headSeq, tailSeq)
+	size, err = db.lSetMeta(metaKey, headSeq, tailSeq)
+	if err != nil {
+		return nil, err
+	}
 	if size == 0 {
 		db.rmExpire(t, ListType, key)
 	}
@@ -332,7 +336,10 @@ func (db *DBList) ltrim(ctx context.Context, key []byte, trimSize, whereSeq int3
 		t.Delete(itemKey)
 	}
 
-	size = db.lSetMeta(metaKey, headSeq, tailSeq)
+	size, err = db.lSetMeta(metaKey, headSeq, tailSeq)
+	if err != nil {
+		return 0, err
+	}
 	if size == 0 {
 		db.rmExpire(t, ListType, key)
 	}
