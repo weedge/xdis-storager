@@ -156,6 +156,9 @@ func (m *Storager) checkTTL() {
 	if m.opts.TTLCheckInterval < 0 {
 		m.opts.TTLCheckInterval = config.DefaultTTLCheckInterval
 	}
+	if m.opts.TTLCheckInterval >= config.MaxTTLCheckInterval {
+		m.opts.TTLCheckInterval = config.DefaultTTLCheckInterval - 1
+	}
 
 	safer.GoSafely(&m.wg, false, func() {
 		tick := time.NewTicker(time.Duration(m.opts.TTLCheckInterval) * time.Second)

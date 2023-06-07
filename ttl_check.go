@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/weedge/pkg/driver"
+	"github.com/weedge/xdis-storager/config"
 )
 
 type onExpired func(*Batch, []byte) (int64, error)
@@ -66,7 +67,7 @@ func (c *TTLChecker) check() {
 		return
 	}
 
-	nc = now + 3600
+	nc = now + config.MaxTTLCheckInterval
 
 	minKey := c.db.expEncodeTimeKey(NoneType, nil, 0)
 	maxKey := c.db.expEncodeTimeKey(maxDataType, nil, nc)

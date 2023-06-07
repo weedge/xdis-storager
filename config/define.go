@@ -6,4 +6,5 @@ const (
 	DefaultDatabases   = 16
 
 	DefaultTTLCheckInterval = 1
+	MaxTTLCheckInterval = 3600
 )
