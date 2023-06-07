@@ -89,6 +89,13 @@ func (m *Storager) InitOpts(opts *config.StorgerOptions) {
 		opts.Databases = MaxDatabases
 	}
 
+	if opts.TTLCheckInterval < 0 {
+		opts.TTLCheckInterval = config.DefaultTTLCheckInterval
+	}
+	if opts.TTLCheckInterval > config.MaxTTLCheckInterval-config.DefaultTTLCheckInterval {
+		opts.TTLCheckInterval = config.MaxTTLCheckInterval - config.DefaultTTLCheckInterval
+	}
+
 	m.opts = opts
 }
 
@@ -152,13 +159,6 @@ func (m *Storager) Select(index int) (idb driver.IDB, err error) {
 func (m *Storager) checkTTL() {
 	m.ttlCheckers = make([]*TTLChecker, 0, config.DefaultDatabases)
 	m.ttlCheckerCh = make(chan *TTLChecker, config.DefaultDatabases)
-
-	if m.opts.TTLCheckInterval < 0 {
-		m.opts.TTLCheckInterval = config.DefaultTTLCheckInterval
-	}
-	if m.opts.TTLCheckInterval >= config.MaxTTLCheckInterval {
-		m.opts.TTLCheckInterval = config.DefaultTTLCheckInterval - 1
-	}
 
 	safer.GoSafely(&m.wg, false, func() {
 		tick := time.NewTicker(time.Duration(m.opts.TTLCheckInterval) * time.Second)
