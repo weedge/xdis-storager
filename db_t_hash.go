@@ -51,15 +51,20 @@ func (db *DBHash) delete(t *Batch, key []byte) (num int64, err error) {
 
 // Del cleans multi hash data.
 func (db *DBHash) Del(ctx context.Context, keys ...[]byte) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	for _, key := range keys {
+		if err := checkKeySize(key); err != nil {
+			return 0, err
+		}
+	}
+
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
 
 	for _, key := range keys {
-		if err := checkKeySize(key); err != nil {
-			return 0, err
-		}
-
 		db.delete(t, key)
 		db.rmExpire(t, HashType, key)
 	}

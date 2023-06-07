@@ -184,14 +184,18 @@ func (db *DBSet) sDiffGeneric(ctx context.Context, keys ...[]byte) ([][]byte, er
 
 // SDiff gets the different of sets.
 func (db *DBSet) SDiff(ctx context.Context, keys ...[]byte) ([][]byte, error) {
-	v, err := db.sDiffGeneric(ctx, keys...)
-	return v, err
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	return db.sDiffGeneric(ctx, keys...)
 }
 
 // SDiffStore gets the different of sets and stores to dest set.
 func (db *DBSet) SDiffStore(ctx context.Context, dstKey []byte, keys ...[]byte) (int64, error) {
-	n, err := db.sStoreGeneric(ctx, dstKey, DiffType, keys...)
-	return n, err
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	return db.sStoreGeneric(ctx, dstKey, DiffType, keys...)
 }
 
 // SKeyExists checks whether set existed or not.
@@ -404,8 +408,6 @@ func (db *DBSet) sStoreGeneric(ctx context.Context, dstKey []byte, optType byte,
 	t.Lock()
 	defer t.Unlock()
 
-	db.delete(t, dstKey)
-
 	var err error
 	var ek []byte
 	var v [][]byte
@@ -418,10 +420,11 @@ func (db *DBSet) sStoreGeneric(ctx context.Context, dstKey []byte, optType byte,
 	case InterType:
 		v, err = db.sInterGeneric(ctx, keys...)
 	}
-
 	if err != nil {
 		return 0, err
 	}
+
+	db.delete(t, dstKey)
 
 	for _, m := range v {
 		if err := checkSetKMSize(ctx, dstKey, m); err != nil {
@@ -449,6 +452,14 @@ func (db *DBSet) sStoreGeneric(ctx context.Context, dstKey []byte, optType byte,
 
 // Del clears multi sets.
 func (db *DBSet) Del(ctx context.Context, keys ...[]byte) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	for _, key := range keys {
+		if err := checkKeySize(key); err != nil {
+			return 0, err
+		}
+	}
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()

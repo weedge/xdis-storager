@@ -73,6 +73,15 @@ func (db *DBZSet) zRemRange(t *Batch, key []byte, min int64, max int64, offset i
 
 // Del clears multi zsets.
 func (db *DBZSet) Del(ctx context.Context, keys ...[]byte) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	for _, key := range keys {
+		if err := checkKeySize(key); err != nil {
+			return 0, err
+		}
+	}
+
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
@@ -429,6 +438,7 @@ func (db *DBZSet) zRange(ctx context.Context, key []byte, min int64, max int64, 
 	return v, nil
 }
 
+// zParseLimit parse index pos to limit offset count
 func (db *DBZSet) zParseLimit(ctx context.Context, key []byte, start int, stop int) (offset int, count int, err error) {
 	if start < 0 || stop < 0 {
 		//refer redis implementation
@@ -569,6 +579,7 @@ func (db *DBZSet) ZRevRangeByScore(ctx context.Context, key []byte, min int64, m
 }
 
 // ZRangeGeneric is a generic function for scan zset.
+// zrange/zrevrange index pos start,stop
 func (db *DBZSet) ZRangeGeneric(ctx context.Context, key []byte, start int, stop int, reverse bool) ([]driver.ScorePair, error) {
 	offset, count, err := db.zParseLimit(ctx, key, start, stop)
 	if err != nil {
@@ -580,7 +591,7 @@ func (db *DBZSet) ZRangeGeneric(ctx context.Context, key []byte, start int, stop
 
 // ZRangeByScoreGeneric is a generic function to scan zset with score.
 // min and max must be inclusive
-// if no limit, set offset = 0 and count = -1
+// if no limit, set offset = 0 and count<0
 func (db *DBZSet) ZRangeByScoreGeneric(ctx context.Context, key []byte, min int64, max int64,
 	offset int, count int, reverse bool) ([]driver.ScorePair, error) {
 

@@ -336,9 +336,9 @@ func (db *DBList) ltrim(ctx context.Context, key []byte, trimSize, whereSeq int3
 		t.Delete(itemKey)
 	}
 
-	size,err = db.lSetMeta(metaKey, headSeq, tailSeq)
-	if err!=nil{
-		return 0,err
+	size, err = db.lSetMeta(metaKey, headSeq, tailSeq)
+	if err != nil {
+		return 0, err
 	}
 	if size == 0 {
 		db.rmExpire(t, ListType, key)
@@ -567,18 +567,22 @@ func (db *DBList) lblockPop(ctx context.Context, keys [][]byte, whereSeq int32, 
 
 // Del clears multi lists.
 func (db *DBList) Del(ctx context.Context, keys ...[]byte) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	for _, key := range keys {
+		if err := checkKeySize(key); err != nil {
+			return 0, err
+		}
+	}
+
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
 
 	for _, key := range keys {
-		if err := checkKeySize(key); err != nil {
-			return 0, err
-		}
-
 		db.delete(t, key)
 		db.rmExpire(t, ListType, key)
-
 	}
 
 	err := t.Commit()
