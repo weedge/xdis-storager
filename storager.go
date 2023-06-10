@@ -1,6 +1,7 @@
 package storager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -130,7 +131,7 @@ func (m *Storager) Close() (err error) {
 }
 
 // Select chooses a database.
-func (m *Storager) Select(index int) (idb driver.IDB, err error) {
+func (m *Storager) Select(ctx context.Context, index int) (idb driver.IDB, err error) {
 	if index < 0 || index >= m.opts.Databases {
 		return nil, fmt.Errorf("invalid db index %d, must in [0, %d]", index, m.opts.Databases-1)
 	}
@@ -181,7 +182,7 @@ func (m *Storager) checkTTL() {
 }
 
 // FlushAll will clear all data
-func (m *Storager) FlushAll() error {
+func (m *Storager) FlushAll(ctx context.Context) error {
 	m.wLock.Lock()
 	defer m.wLock.Unlock()
 
