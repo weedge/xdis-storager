@@ -11,9 +11,9 @@ type StorgerOptions struct {
 
 func DefaultStoragerOptions() *StorgerOptions {
 	return &StorgerOptions{
-		DataDir:     DefaultDataDir,
-		Databases:   DefaultDatabases,
-		KVStoreName: DefaultKVStoreName,
+		DataDir:          DefaultDataDir,
+		Databases:        DefaultDatabases,
+		KVStoreName:      DefaultKVStoreName,
+		TTLCheckInterval: DefaultTTLCheckInterval,
 	}
 }
-
