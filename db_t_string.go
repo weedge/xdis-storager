@@ -273,13 +273,13 @@ func (db *DBString) SetEX(ctx context.Context, key []byte, duration int64, value
 // SetNXEX set k v nx ex seconds
 // NX -- Only set the key if it does not already exist.
 // EX seconds -- Set the specified expire time, in seconds.
-func (db *DBString) SetNXEX(ctx context.Context, key []byte, duration int64, value []byte) error {
+func (db *DBString) SetNXEX(ctx context.Context, key []byte, duration int64, value []byte) (n int64, err error) {
 	if err := checkKeySize(key); err != nil {
-		return err
+		return 0, err
 	} else if err := checkValueSize(value); err != nil {
-		return err
+		return 0, err
 	} else if duration <= 0 {
-		return ErrExpireValue
+		return 0, ErrExpireValue
 	}
 
 	ek := db.encodeStringKey(key)
@@ -289,28 +289,32 @@ func (db *DBString) SetNXEX(ctx context.Context, key []byte, duration int64, val
 	t.Lock()
 	defer t.Unlock()
 
-	if v, err := db.IKV.Get(key); err != nil {
-		return err
+	if v, err := db.IKV.Get(ek); err != nil {
+		return 0, err
 	} else if v != nil {
-		return nil
+		return 0, nil
 	}
 
 	t.Put(ek, value)
 	db.expireAt(t, StringType, key, time.Now().Unix()+duration)
+	err = t.Commit()
+	if err != nil {
+		return
+	}
 
-	return t.Commit()
+	return 1, nil
 }
 
 // SetXXEX set k v xx ex seconds
 // XX -- Only set the key if it already exists.
 // EX seconds -- Set the specified expire time, in seconds.
-func (db *DBString) SetXXEX(ctx context.Context, key []byte, duration int64, value []byte) error {
-	if err := checkKeySize(key); err != nil {
-		return err
-	} else if err := checkValueSize(value); err != nil {
-		return err
+func (db *DBString) SetXXEX(ctx context.Context, key []byte, duration int64, value []byte) (n int64, err error) {
+	if err = checkKeySize(key); err != nil {
+		return
+	} else if err = checkValueSize(value); err != nil {
+		return
 	} else if duration <= 0 {
-		return ErrExpireValue
+		return 0, ErrExpireValue
 	}
 
 	ek := db.encodeStringKey(key)
@@ -320,16 +324,20 @@ func (db *DBString) SetXXEX(ctx context.Context, key []byte, duration int64, val
 	t.Lock()
 	defer t.Unlock()
 
-	if v, err := db.IKV.Get(key); err != nil {
-		return err
+	if v, err := db.IKV.Get(ek); err != nil {
+		return 0, err
 	} else if v == nil {
-		return nil
+		return 0, nil
 	}
 
 	t.Put(ek, value)
 	db.expireAt(t, StringType, key, time.Now().Unix()+duration)
+	err = t.Commit()
+	if err != nil {
+		return
+	}
 
-	return t.Commit()
+	return 1, nil
 }
 
 // Del deletes the data.
