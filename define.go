@@ -116,7 +116,8 @@ var TypeName = map[byte]string{
 }
 
 var (
-	ErrIntNumber = errors.New("ERR invalid integer")
+	ErrValueIntOutOfRange = errors.New("value is not an integer or out of range")
+	ErrIntNumber          = errors.New("ERR invalid integer")
 
 	ErrKeySize     = errors.New("ERR invalid key size")
 	ErrValueSize   = errors.New("ERR invalid value size")

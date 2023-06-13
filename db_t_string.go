@@ -153,7 +153,7 @@ func (db *DBString) incr(ctx context.Context, key []byte, delta int64) (int64, e
 	var n int64
 	n, err = utils.StrInt64(db.IKV.Get(key))
 	if err != nil {
-		return 0, err
+		return 0, ErrValueIntOutOfRange
 	}
 
 	n += delta
@@ -530,6 +530,9 @@ func (db *DBString) StrLen(ctx context.Context, key []byte) (int64, error) {
 	s, err := db.GetSlice(ctx, key)
 	if err != nil {
 		return 0, err
+	}
+	if s == nil {
+		return 0, nil
 	}
 
 	n := s.Size()
