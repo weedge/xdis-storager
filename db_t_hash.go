@@ -64,13 +64,16 @@ func (db *DBHash) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 	t.Lock()
 	defer t.Unlock()
 
+	nums := 0
 	for _, key := range keys {
-		db.delete(t, key)
+		if n, err := db.delete(t, key); err == nil && n > 0 {
+			nums++
+		}
 		db.rmExpire(t, HashType, key)
 	}
 
 	err := t.Commit()
-	return int64(len(keys)), err
+	return int64(nums), err
 }
 
 func (db *DBHash) hSetItem(ctx context.Context, key []byte, field []byte, value []byte) (int64, error) {
@@ -263,11 +266,10 @@ func (db *DBHash) HIncrBy(ctx context.Context, key []byte, field []byte, delta i
 
 	var n int64
 	if n, err = utils.StrInt64(db.IKV.Get(ek)); err != nil {
-		return 0, err
+		return 0, ErrHashIntVal
 	}
 
 	n += delta
-
 	_, err = db.hSetItem(ctx, key, field, strconv.AppendInt(nil, n, 10))
 	if err != nil {
 		return 0, err
@@ -394,6 +396,15 @@ func (db *DBHash) ExpireAt(ctx context.Context, key []byte, when int64) (int64, 
 func (db *DBHash) TTL(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return -1, err
+	}
+
+	sk := db.hEncodeSizeKey(key)
+	v, err := db.IKV.Get(sk)
+	if err != nil {
+		return -1, err
+	}
+	if v == nil {
+		return -2, nil
 	}
 
 	return db.ttl(HashType, key)

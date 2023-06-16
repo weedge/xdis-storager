@@ -116,7 +116,7 @@ var TypeName = map[byte]string{
 }
 
 var (
-	ErrValueIntOutOfRange = errors.New("value is not an integer or out of range")
+	ErrValueIntOutOfRange = errors.New("ERR value is not an integer or out of range")
 	ErrIntNumber          = errors.New("ERR invalid integer")
 
 	ErrKeySize     = errors.New("ERR invalid key size")
@@ -131,6 +131,7 @@ var (
 	ErrListIndex = errors.New("ERR invalid list index")
 
 	ErrHashKey       = errors.New("ERR invalid hash key")
+	ErrHashIntVal       = errors.New("ERR hash value is not an integer")
 	ErrHSizeKey      = errors.New("ERR invalid hsize key")
 	ErrHashFieldSize = errors.New("ERR invalid hash field size")
 

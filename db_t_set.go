@@ -464,17 +464,16 @@ func (db *DBSet) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 	t.Lock()
 	defer t.Unlock()
 
+	nums := 0
 	for _, key := range keys {
-		if err := checkKeySize(key); err != nil {
-			return 0, err
+		if n, err := db.delete(t, key); err == nil && n > 0 {
+			nums++
 		}
-
-		db.delete(t, key)
 		db.rmExpire(t, SetType, key)
 	}
 
 	err := t.Commit()
-	return int64(len(keys)), err
+	return int64(nums), err
 }
 
 // Exists checks whether set existed or not.
@@ -514,6 +513,15 @@ func (db *DBSet) ExpireAt(ctx context.Context, key []byte, when int64) (int64, e
 func (db *DBSet) TTL(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return -1, err
+	}
+
+	sk := db.sEncodeSizeKey(key)
+	v, err := db.IKV.Get(sk)
+	if err != nil {
+		return -1, err
+	}
+	if v == nil {
+		return -2, nil
 	}
 
 	return db.ttl(SetType, key)

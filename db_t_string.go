@@ -358,13 +358,18 @@ func (db *DBString) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 	t.Lock()
 	defer t.Unlock()
 
+	nums := 0
 	for i, k := range keys {
+		v, err := db.IKV.Get(codedKeys[i])
+		if err == nil && v != nil {
+			nums++
+		}
 		t.Delete(codedKeys[i])
 		db.rmExpire(t, StringType, k)
 	}
 
 	err := t.Commit()
-	return int64(len(keys)), err
+	return int64(nums), err
 }
 
 // Exists check data exists or not.
@@ -424,6 +429,15 @@ func (db *DBString) setExpireAt(ctx context.Context, key []byte, when int64) (in
 func (db *DBString) TTL(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return -1, err
+	}
+
+	sk := db.encodeStringKey(key)
+	v, err := db.IKV.Get(sk)
+	if err != nil {
+		return -1, err
+	}
+	if v == nil {
+		return -2, nil
 	}
 
 	return db.ttl(StringType, key)

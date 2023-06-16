@@ -549,7 +549,7 @@ func (db *DBList) lblockPop(ctx context.Context, keys [][]byte, whereSeq int32, 
 				return nil, err
 			} else if v != nil {
 				cancel()
-				return []interface{}{key, v}, nil
+				return v, nil
 			}
 		}
 
@@ -580,13 +580,16 @@ func (db *DBList) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 	t.Lock()
 	defer t.Unlock()
 
+	nums := 0
 	for _, key := range keys {
-		db.delete(t, key)
+		if n, err := db.delete(t, key); err == nil && n > 0 {
+			nums++
+		}
 		db.rmExpire(t, ListType, key)
 	}
 
 	err := t.Commit()
-	return int64(len(keys)), err
+	return int64(nums), err
 }
 
 func (db *DBList) lExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
@@ -629,6 +632,15 @@ func (db *DBList) ExpireAt(ctx context.Context, key []byte, when int64) (int64, 
 func (db *DBList) TTL(ctx context.Context, key []byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return -1, err
+	}
+
+	sk := db.lEncodeMetaKey(key)
+	v, err := db.IKV.Get(sk)
+	if err != nil {
+		return -1, err
+	}
+	if v == nil {
+		return -2, nil
 	}
 
 	return db.ttl(ListType, key)
