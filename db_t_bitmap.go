@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"context"
 )
@@ -24,12 +23,6 @@ func NewDBBitmap(db *DB) *DBBitmap {
 	return &DBBitmap{DB: db, batch: batch}
 }
 
-func (db *DBBitmap) delete(t *Batch, key []byte) (int64, error) {
-	key = db.encodeBitmapKey(key)
-	t.Delete(key)
-	return 1, nil
-}
-
 // BitOP does the bit operations in data.
 func (db *DBBitmap) BitOP(ctx context.Context, op string, destKey []byte, srcKeys ...[]byte) (int64, error) {
 	if err := checkKeySize(destKey); err != nil {
@@ -45,8 +38,7 @@ func (db *DBBitmap) BitOP(ctx context.Context, op string, destKey []byte, srcKey
 		return 0, nil
 	}
 
-	key := db.encodeBitmapKey(srcKeys[0])
-
+	key := db.encodeStringKey(srcKeys[0])
 	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
@@ -62,7 +54,7 @@ func (db *DBBitmap) BitOP(ctx context.Context, op string, destKey []byte, srcKey
 				return 0, err
 			}
 
-			key = db.encodeBitmapKey(srcKeys[j])
+			key = db.encodeStringKey(srcKeys[j])
 			ovalue, err := db.IKV.Get(key)
 			if err != nil {
 				return 0, err
@@ -98,7 +90,7 @@ func (db *DBBitmap) BitOP(ctx context.Context, op string, destKey []byte, srcKey
 		}
 	}
 
-	key = db.encodeBitmapKey(destKey)
+	key = db.encodeStringKey(destKey)
 
 	t := db.batch
 
@@ -139,7 +131,7 @@ func (db *DBBitmap) BitCount(ctx context.Context, key []byte, start int, end int
 		return 0, err
 	}
 
-	key = db.encodeBitmapKey(key)
+	key = db.encodeStringKey(key)
 	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
@@ -177,7 +169,7 @@ func (db *DBBitmap) BitPos(ctx context.Context, key []byte, on int, start int, e
 		skipValue = 0xFF
 	}
 
-	key = db.encodeBitmapKey(key)
+	key = db.encodeStringKey(key)
 	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
@@ -216,7 +208,7 @@ func (db *DBBitmap) SetBit(ctx context.Context, key []byte, offset int, on int) 
 	t.Lock()
 	defer t.Unlock()
 
-	key = db.encodeBitmapKey(key)
+	key = db.encodeStringKey(key)
 	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
@@ -255,8 +247,7 @@ func (db *DBBitmap) GetBit(ctx context.Context, key []byte, offset int) (int64, 
 		return 0, err
 	}
 
-	key = db.encodeBitmapKey(key)
-
+	key = db.encodeStringKey(key)
 	value, err := db.IKV.Get(key)
 	if err != nil {
 		return 0, err
@@ -275,111 +266,4 @@ func (db *DBBitmap) GetBit(ctx context.Context, key []byte, offset int) (int64, 
 	}
 
 	return 0, nil
-}
-
-// Del deletes the data.
-func (db *DBBitmap) Del(ctx context.Context, keys ...[]byte) (int64, error) {
-	if len(keys) == 0 {
-		return 0, nil
-	}
-
-	codedKeys := make([][]byte, len(keys))
-	for i, k := range keys {
-		if err := checkKeySize(k); err != nil {
-			return 0, err
-		}
-		codedKeys[i] = db.encodeBitmapKey(k)
-	}
-
-	t := db.batch
-	t.Lock()
-	defer t.Unlock()
-
-	for i, k := range keys {
-		t.Delete(codedKeys[i])
-		db.rmExpire(t, BitmapType, k)
-	}
-
-	err := t.Commit()
-	return int64(len(keys)), err
-}
-
-// Exists check data exists or not.
-func (db *DBBitmap) Exists(ctx context.Context, key []byte) (int64, error) {
-	if err := checkKeySize(key); err != nil {
-		return 0, err
-	}
-
-	var err error
-	key = db.encodeBitmapKey(key)
-
-	var v []byte
-	v, err = db.IKV.Get(key)
-	if v != nil && err == nil {
-		return 1, nil
-	}
-
-	return 0, err
-}
-
-// Expire expires the data.
-func (db *DBBitmap) Expire(ctx context.Context, key []byte, duration int64) (int64, error) {
-	if duration <= 0 {
-		return 0, ErrExpireValue
-	}
-
-	return db.setExpireAt(ctx, key, time.Now().Unix()+duration)
-}
-
-// ExpireAt expires the data at when.
-func (db *DBBitmap) ExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
-	if when <= time.Now().Unix() {
-		return 0, ErrExpireValue
-	}
-
-	return db.setExpireAt(ctx, key, when)
-}
-
-func (db *DBBitmap) setExpireAt(ctx context.Context, key []byte, when int64) (int64, error) {
-	t := db.batch
-	t.Lock()
-	defer t.Unlock()
-
-	if exist, err := db.Exists(ctx, key); err != nil || exist == 0 {
-		return 0, err
-	}
-
-	db.expireAt(t, BitmapType, key, when)
-	if err := t.Commit(); err != nil {
-		return 0, err
-	}
-
-	return 1, nil
-}
-
-// TTL returns the TTL of the data.
-func (db *DBBitmap) TTL(ctx context.Context, key []byte) (int64, error) {
-	if err := checkKeySize(key); err != nil {
-		return -1, err
-	}
-
-	return db.ttl(BitmapType, key)
-}
-
-// Persist removes the TTL of the data.
-func (db *DBBitmap) Persist(ctx context.Context, key []byte) (int64, error) {
-	if err := checkKeySize(key); err != nil {
-		return 0, err
-	}
-
-	t := db.batch
-	t.Lock()
-	defer t.Unlock()
-	n, err := db.rmExpire(t, BitmapType, key)
-	if err != nil {
-		return 0, err
-	}
-
-	err = t.Commit()
-	return n, err
 }

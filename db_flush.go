@@ -13,7 +13,6 @@ func (db *DB) FlushDB(ctx context.Context) (drop int64, err error) {
 		db.hashFlush,
 		db.setFlush,
 		db.zsetFlush,
-		db.bitmapFlush,
 	}
 
 	for _, flush := range all {
@@ -48,9 +47,6 @@ func (db *DB) flushType(t *Batch, dataType byte) (drop int64, err error) {
 	case ZSetType:
 		deleteFunc = db.zset.delete
 		metaDataType = ZSizeType
-	case BitmapType:
-		deleteFunc = db.bitmap.delete
-		metaDataType = BitmapType
 	default:
 		return 0, fmt.Errorf("invalid data type: %s", TypeName[dataType])
 	}
@@ -107,11 +103,4 @@ func (db *DB) zsetFlush() (drop int64, err error) {
 	t.Lock()
 	defer t.Unlock()
 	return db.flushType(t, ZSetType)
-}
-
-func (db *DB) bitmapFlush() (drop int64, err error) {
-	t := db.bitmap.batch
-	t.Lock()
-	defer t.Unlock()
-	return db.flushType(t, BitmapType)
 }
