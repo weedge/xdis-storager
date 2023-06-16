@@ -176,6 +176,9 @@ func (db *DBBitmap) BitPos(ctx context.Context, key []byte, on int, start int, e
 	}
 
 	start, end = getRange(start, end, len(value))
+	if start > end {
+		return -1, nil
+	}
 	value = value[start : end+1]
 
 	for i, v := range value {
