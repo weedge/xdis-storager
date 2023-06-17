@@ -171,12 +171,11 @@ func (db *DBSet) sDiffGeneric(ctx context.Context, keys ...[]byte) ([][]byte, er
 
 	slice := make([][]byte, len(destMap))
 	idx := 0
-	for k, v := range destMap {
-		if !v {
-			continue
+	for _, m := range members {
+		if _, ok := destMap[utils.Bytes2String(m)]; ok {
+			slice[idx] = m
+			idx++
 		}
-		slice[idx] = []byte(k)
-		idx++
 	}
 
 	return slice, nil
@@ -252,13 +251,11 @@ func (db *DBSet) sInterGeneric(ctx context.Context, keys ...[]byte) ([][]byte, e
 
 	slice := make([][]byte, len(destMap))
 	idx := 0
-	for k, v := range destMap {
-		if !v {
-			continue
+	for _, m := range members {
+		if _, ok := destMap[utils.Bytes2String(m)]; ok {
+			slice[idx] = m
+			idx++
 		}
-
-		slice[idx] = []byte(k)
-		idx++
 	}
 
 	return slice, nil
@@ -358,6 +355,7 @@ func (db *DBSet) SRem(ctx context.Context, key []byte, args ...[]byte) (int64, e
 
 func (db *DBSet) sUnionGeneric(ctx context.Context, keys ...[]byte) ([][]byte, error) {
 	dstMap := make(map[string]bool)
+	slice := [][]byte{}
 
 	for _, key := range keys {
 		if err := checkKeySize(key); err != nil {
@@ -370,18 +368,11 @@ func (db *DBSet) sUnionGeneric(ctx context.Context, keys ...[]byte) ([][]byte, e
 		}
 
 		for _, member := range members {
+			if _, ok := dstMap[utils.Bytes2String(member)]; !ok {
+				slice = append(slice, member)
+			}
 			dstMap[utils.Bytes2String(member)] = true
 		}
-	}
-
-	slice := make([][]byte, len(dstMap))
-	idx := 0
-	for k, v := range dstMap {
-		if !v {
-			continue
-		}
-		slice[idx] = []byte(k)
-		idx++
 	}
 
 	return slice, nil
