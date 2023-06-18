@@ -54,7 +54,7 @@ func (db *DBZSet) zRemRange(t *Batch, key []byte, min int64, max int64, offset i
 			continue
 		}
 
-		if n, err := db.zDelItem(t, key, m, true); err != nil {
+		if n, err := db.zDelItem(t, key, m, false); err != nil {
 			return 0, err
 		} else if n == 1 {
 			num++
@@ -103,22 +103,24 @@ func (db *DBZSet) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 
 func (db *DBZSet) zDelItem(t *Batch, key []byte, member []byte, skipDelScore bool) (int64, error) {
 	ek := db.zEncodeSetKey(key, member)
-	if v, err := db.IKV.Get(ek); err != nil {
+	v, err := db.IKV.Get(ek)
+	if err != nil {
 		return 0, err
-	} else if v == nil {
-		//not exists
+	}
+	//not exists return
+	if v == nil {
 		return 0, nil
-	} else {
-		//exists
-		if !skipDelScore {
-			//we must del score
-			s, err := Int64(v, err)
-			if err != nil {
-				return 0, err
-			}
-			sk := db.zEncodeScoreKey(key, member, s)
-			t.Delete(sk)
+	}
+
+	//exists
+	if !skipDelScore {
+		//we must del score
+		s, err := Int64(v, err)
+		if err != nil {
+			return 0, err
 		}
+		sk := db.zEncodeScoreKey(key, member, s)
+		t.Delete(sk)
 	}
 
 	t.Delete(ek)
@@ -858,17 +860,32 @@ func (db *DBZSet) ZRemRangeByLex(ctx context.Context, key []byte, min []byte, ma
 	it := db.IKV.RangeIterator(min, max, rangeType)
 	defer it.Close()
 
-	var n int64
+	var num int64
 	for ; it.Valid(); it.Next() {
-		t.Delete(it.RawKey())
-		n++
+		ek := it.RawKey()
+		_, m, err := db.zDecodeSetKey(ek)
+		if err != nil {
+			continue
+		}
+
+		if n, err := db.zDelItem(t, key, m, false); err != nil {
+			return 0, err
+		} else if n == 1 {
+			num++
+		}
+
+		t.Delete(ek)
+	}
+
+	if _, err := db.zIncrSize(t, key, -num); err != nil {
+		return 0, err
 	}
 
 	if err := t.Commit(); err != nil {
 		return 0, err
 	}
 
-	return n, nil
+	return num, nil
 }
 
 // ZLexCount gets the count of zset lexicographically.
