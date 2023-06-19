@@ -131,7 +131,7 @@ var (
 	ErrListIndex = errors.New("ERR invalid list index")
 
 	ErrHashKey       = errors.New("ERR invalid hash key")
-	ErrHashIntVal       = errors.New("ERR hash value is not an integer")
+	ErrHashIntVal    = errors.New("ERR hash value is not an integer")
 	ErrHSizeKey      = errors.New("ERR invalid hsize key")
 	ErrHashFieldSize = errors.New("ERR invalid hash field size")
 
@@ -210,4 +210,8 @@ const (
 	BitOR  = "or"
 	BitXOR = "xor"
 	BitNot = "not"
+)
+
+const (
+	RegisterStoragerName = "xdis-storager"
 )

@@ -43,32 +43,36 @@ type Storager struct {
 	quit         chan struct{}
 }
 
-func Open(opts *config.StorgerOptions) (store *Storager, err error) {
+func New(opts *config.StorgerOptions) (store *Storager) {
 	store = &Storager{}
 	store.InitOpts(opts)
+	return
+}
 
-	os.MkdirAll(opts.DataDir, 0755)
+func (store *Storager) Open(ctx context.Context) (err error) {
+	opts := store.opts
 
-	defer func(s *Storager) {
+	defer func() {
 		if err != nil {
-			if e := s.Close(); e != nil {
+			if e := store.Close(); e != nil {
 				klog.Errorf("close store err: %s", e.Error())
 			}
 		}
-	}(store)
+	}()
 
+	os.MkdirAll(opts.DataDir, 0755)
 	store.fLock = flock.New(path.Join(opts.DataDir, "LOCK"))
 	ok, err := store.fLock.TryLock()
 	if err != nil {
-		return
+		return err
 	}
 	if !ok {
 		err = fmt.Errorf("store file had locked")
-		return
+		return err
 	}
 
 	if store.odb, err = openkv.Open(opts); err != nil {
-		return nil, err
+		return
 	}
 
 	store.dbs = make(map[int]*DB, opts.Databases)
@@ -77,6 +81,10 @@ func Open(opts *config.StorgerOptions) (store *Storager, err error) {
 	store.checkTTL()
 
 	return
+}
+
+func (m *Storager) Name() string {
+	return RegisterStoragerName
 }
 
 func (m *Storager) InitOpts(opts *config.StorgerOptions) {

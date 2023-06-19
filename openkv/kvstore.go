@@ -41,7 +41,7 @@ func Open(opts *config.StorgerOptions) (db *DB, err error) {
 	db = &DB{
 		opts: opts,
 		IDB:  idb,
-		name: store.String(),
+		name: store.Name(),
 	}
 
 	return
