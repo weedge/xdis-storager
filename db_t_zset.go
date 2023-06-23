@@ -37,6 +37,8 @@ func checkZSetKMSize(key []byte, member []byte) error {
 
 func (db *DBZSet) delete(t *Batch, key []byte) (num int64, err error) {
 	num, err = db.zRemRange(t, key, MinScore, MaxScore, 0, -1)
+	sizeKey := db.zEncodeSizeKey(key)
+	t.Delete(sizeKey)
 	return
 }
 
@@ -62,10 +64,6 @@ func (db *DBZSet) zRemRange(t *Batch, key []byte, min int64, max int64, offset i
 	}
 	it.Close()
 
-	if _, err := db.zIncrSize(t, key, -num); err != nil {
-		return 0, err
-	}
-
 	return num, nil
 }
 
@@ -86,7 +84,7 @@ func (db *DBZSet) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 
 	nums := 0
 	for _, key := range keys {
-		n, err := db.zRemRange(t, key, MinScore, MaxScore, 0, -1)
+		n, err := db.delete(t, key)
 		if err != nil {
 			return 0, err
 		}
@@ -481,37 +479,6 @@ func (db *DBZSet) zParseLimit(ctx context.Context, key []byte, start int, stop i
 	return
 }
 
-// ZClear clears the zset.
-func (db *DBZSet) ZClear(ctx context.Context, key []byte) (int64, error) {
-	t := db.batch
-	t.Lock()
-	defer t.Unlock()
-
-	rmCnt, err := db.zRemRange(t, key, MinScore, MaxScore, 0, -1)
-	if err == nil {
-		err = t.Commit()
-	}
-
-	return rmCnt, err
-}
-
-// ZMclear clears multi zsets.
-func (db *DBZSet) ZMclear(keys ...[]byte) (int64, error) {
-	t := db.batch
-	t.Lock()
-	defer t.Unlock()
-
-	for _, key := range keys {
-		if _, err := db.zRemRange(t, key, MinScore, MaxScore, 0, -1); err != nil {
-			return 0, err
-		}
-	}
-
-	err := t.Commit()
-
-	return int64(len(keys)), err
-}
-
 // ZRange gets the members from start to stop.
 func (db *DBZSet) ZRange(ctx context.Context, key []byte, start int, stop int) ([]driver.ScorePair, error) {
 	return db.ZRangeGeneric(ctx, key, start, stop, false)
@@ -543,12 +510,17 @@ func (db *DBZSet) ZRemRangeByRank(ctx context.Context, key []byte, start int, st
 	t.Lock()
 	defer t.Unlock()
 
-	rmCnt, err = db.zRemRange(t, key, MinScore, MaxScore, offset, count)
-	if err == nil {
-		err = t.Commit()
+	if rmCnt, err = db.zRemRange(t, key, MinScore, MaxScore, offset, count); err != nil {
+		return 0, err
+	}
+	if _, err = db.zIncrSize(t, key, -rmCnt); err != nil {
+		return 0, err
+	}
+	if err = t.Commit(); err != nil {
+		return 0, err
 	}
 
-	return rmCnt, err
+	return rmCnt, nil
 }
 
 // ZRemRangeByScore removes the data with score at [min, max]
@@ -558,11 +530,17 @@ func (db *DBZSet) ZRemRangeByScore(ctx context.Context, key []byte, min int64, m
 	defer t.Unlock()
 
 	rmCnt, err := db.zRemRange(t, key, min, max, 0, -1)
-	if err == nil {
-		err = t.Commit()
+	if err != nil {
+		return 0, nil
+	}
+	if _, err := db.zIncrSize(t, key, -rmCnt); err != nil {
+		return 0, err
+	}
+	if err = t.Commit(); err != nil {
+		return 0, err
 	}
 
-	return rmCnt, err
+	return rmCnt, nil
 }
 
 // ZRevRange gets the data reversed.
