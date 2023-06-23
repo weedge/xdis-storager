@@ -54,7 +54,7 @@ func (db *DBZSet) zRemRange(t *Batch, key []byte, min int64, max int64, offset i
 			continue
 		}
 
-		if n, err := db.zDelItem(t, key, m, false); err != nil {
+		if n, err := db.zDelItem(t, key, m, true); err != nil {
 			return 0, err
 		} else if n == 1 {
 			num++
@@ -868,7 +868,7 @@ func (db *DBZSet) ZRemRangeByLex(ctx context.Context, key []byte, min []byte, ma
 			continue
 		}
 
-		if n, err := db.zDelItem(t, key, m, false); err != nil {
+		if n, err := db.zDelItem(t, key, m, true); err != nil {
 			return 0, err
 		} else if n == 1 {
 			num++
