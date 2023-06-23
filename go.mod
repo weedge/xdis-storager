@@ -6,7 +6,7 @@ require (
 	github.com/cloudwego/kitex v0.5.2
 	github.com/gofrs/flock v0.8.1
 	github.com/stretchr/testify v1.8.3
-	github.com/weedge/pkg v0.0.0-20230616035038-f6c50b5a2707
+	github.com/weedge/pkg v0.0.0-20230619110950-673148e3b843
 )
 
 require (

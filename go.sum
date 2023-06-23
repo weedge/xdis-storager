@@ -126,8 +126,8 @@ github.com/stretchr/testify v1.8.3/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/tidwall/gjson v1.9.3/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/match v1.1.1/go.mod h1:eRSPERbgtNPcGhD8UCthc6PmLEQXEWd3PRB5JTxsfmM=
 github.com/tidwall/pretty v1.2.0/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhsoaGGjNU=
-github.com/weedge/pkg v0.0.0-20230616035038-f6c50b5a2707 h1:5VSH8X+l+Skfi/ZQvJkHspb568ykbnb6q9NDY202Tbk=
-github.com/weedge/pkg v0.0.0-20230616035038-f6c50b5a2707/go.mod h1:K/SeqBpX8GSebm2av2h/xfsw1+PzdHRnL8HVQsY4o9w=
+github.com/weedge/pkg v0.0.0-20230619110950-673148e3b843 h1:rlojBBrbVuvZZB1E0tFU2iS9oSk7Mc7wGKC6Ad6ZYSM=
+github.com/weedge/pkg v0.0.0-20230619110950-673148e3b843/go.mod h1:K/SeqBpX8GSebm2av2h/xfsw1+PzdHRnL8HVQsY4o9w=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

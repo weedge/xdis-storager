@@ -53,7 +53,7 @@ func (db *DB) flushType(t *Batch, dataType byte) (drop int64, err error) {
 
 	var keys [][]byte
 	keys, err = db.scanGeneric(metaDataType, nil, 1024, false, "", false)
-	for len(keys) != 0 || err != nil {
+	for len(keys) != 0 || err == nil {
 		for _, key := range keys {
 			deleteFunc(t, key)
 			db.rmExpire(t, dataType, key)
