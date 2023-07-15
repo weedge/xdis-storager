@@ -19,9 +19,12 @@ func NewBatch(store *Storager, wb *openkv.WriteBatch, locker sync.Locker) *Batch
 }
 
 func (b *Batch) Commit() error {
+	if b.store != nil && b.store.committer != nil {
+		return b.store.committer.Commit(b.WriteBatch)
+	}
+
 	b.store.commitLock.Lock()
 	defer b.store.commitLock.Unlock()
-
 	return b.WriteBatch.Commit()
 }
 

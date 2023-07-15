@@ -25,3 +25,7 @@ type IKV interface {
 	Compact() error
 	Close() error
 }
+
+type ICommitter interface {
+	Commit(*openkv.WriteBatch) error
+}

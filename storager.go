@@ -14,6 +14,7 @@ import (
 	"github.com/weedge/pkg/driver"
 	"github.com/weedge/pkg/safer"
 	"github.com/weedge/xdis-storager/config"
+	storagerDriver "github.com/weedge/xdis-storager/driver"
 	"github.com/weedge/xdis-storager/openkv"
 )
 
@@ -24,7 +25,8 @@ type Storager struct {
 	fLock *flock.Flock
 
 	// open kv store engine
-	odb *openkv.DB
+	//odb *openkv.DB
+	odb storagerDriver.IKV
 
 	// multi storager db instances on one kv store engine
 	dbs map[int]*DB
@@ -35,6 +37,9 @@ type Storager struct {
 	wLock sync.RWMutex
 	// allow one write commit at same time
 	commitLock sync.Mutex
+
+	// when set committer, use committer.Commit instead of writebatch commit for write op
+	committer storagerDriver.ICommitter
 
 	// ttl check
 	ttlCheckers  []*TTLChecker
@@ -227,4 +232,24 @@ func (m *Storager) flushAll() (err error) {
 	}
 
 	return nil
+}
+
+// GetKVStore get kvstore engine which save data
+func (s *Storager) GetKVStore() storagerDriver.IKV {
+	return s.odb
+}
+
+// SetCommitter
+func (s *Storager) SetCommitter(committer storagerDriver.ICommitter) {
+	s.committer = committer
+}
+
+// GetRWlock noCopy return rw muxtex lock for read only
+func (s *Storager) GetRWLock() *sync.RWMutex {
+	return &s.wLock
+}
+
+// GetCommitLock noCopy return mutex lock for commit log/data
+func (s *Storager) GetCommitLock() *sync.Mutex {
+	return &s.commitLock
 }
