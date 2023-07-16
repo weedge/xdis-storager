@@ -25,8 +25,8 @@ type Storager struct {
 	fLock *flock.Flock
 
 	// open kv store engine
-	//odb *openkv.DB
-	odb storagerDriver.IKV
+	odb *openkv.DB
+	//odb storagerDriver.IKV
 
 	// multi storager db instances on one kv store engine
 	dbs map[int]*DB
