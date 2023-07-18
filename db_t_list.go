@@ -173,7 +173,7 @@ func (db *DBList) lpush(ctx context.Context, key []byte, whereSeq int32, args ..
 
 	db.lSetMeta(metaKey, headSeq, tailSeq)
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 
 	if err == nil {
 		db.lSignalAsReady(ctx, key)
@@ -232,7 +232,7 @@ func (db *DBList) lpop(ctx context.Context, key []byte, whereSeq int32) ([]byte,
 		db.rmExpire(t, ListType, key)
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return value, err
 }
 
@@ -264,7 +264,7 @@ func (db *DBList) ltrim2(ctx context.Context, key []byte, startP, stopP int64) (
 	if start >= llen || start > stop {
 		db.delete(t, key)
 		db.rmExpire(t, ListType, key)
-		return t.Commit()
+		return t.Commit(ctx)
 	}
 
 	if start < 0 {
@@ -287,7 +287,7 @@ func (db *DBList) ltrim2(ctx context.Context, key []byte, startP, stopP int64) (
 
 	db.lSetMeta(ek, headSeq+start, headSeq+stop)
 
-	return t.Commit()
+	return t.Commit(ctx)
 }
 
 func (db *DBList) ltrim(ctx context.Context, key []byte, trimSize, whereSeq int32) (int32, error) {
@@ -344,7 +344,7 @@ func (db *DBList) ltrim(ctx context.Context, key []byte, trimSize, whereSeq int3
 		db.rmExpire(t, ListType, key)
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return trimEndSeq - trimStartSeq + 1, err
 }
 
@@ -448,7 +448,7 @@ func (db *DBList) LSet(ctx context.Context, key []byte, index int32, value []byt
 	}
 	sk := db.lEncodeListKey(key, seq)
 	t.Put(sk, value)
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return err
 }
 
@@ -588,7 +588,7 @@ func (db *DBList) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 		db.rmExpire(t, ListType, key)
 	}
 
-	err := t.Commit()
+	err := t.Commit(ctx)
 	return int64(nums), err
 }
 
@@ -603,7 +603,7 @@ func (db *DBList) lExpireAt(ctx context.Context, key []byte, when int64) (int64,
 	}
 
 	db.expireAt(t, ListType, key, when)
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -661,7 +661,7 @@ func (db *DBList) Persist(ctx context.Context, key []byte) (int64, error) {
 		return 0, err
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return n, err
 }
 

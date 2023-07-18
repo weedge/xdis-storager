@@ -93,7 +93,7 @@ func (db *DBZSet) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 		}
 	}
 
-	err := t.Commit()
+	err := t.Commit(ctx)
 	return int64(nums), err
 }
 
@@ -204,7 +204,7 @@ func (db *DBZSet) ZAdd(ctx context.Context, key []byte, args ...driver.ScorePair
 		return 0, err
 	}
 
-	err := t.Commit()
+	err := t.Commit(ctx)
 	return num, err
 }
 
@@ -267,7 +267,7 @@ func (db *DBZSet) ZRem(ctx context.Context, key []byte, members ...[]byte) (int6
 		return 0, err
 	}
 
-	err := t.Commit()
+	err := t.Commit(ctx)
 	return num, err
 }
 
@@ -310,7 +310,7 @@ func (db *DBZSet) ZIncrBy(ctx context.Context, key []byte, delta int64, member [
 		t.Delete(oldSk)
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return newScore, err
 }
 
@@ -516,7 +516,7 @@ func (db *DBZSet) ZRemRangeByRank(ctx context.Context, key []byte, start int, st
 	if _, err = db.zIncrSize(t, key, -rmCnt); err != nil {
 		return 0, err
 	}
-	if err = t.Commit(); err != nil {
+	if err = t.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -536,7 +536,7 @@ func (db *DBZSet) ZRemRangeByScore(ctx context.Context, key []byte, min int64, m
 	if _, err := db.zIncrSize(t, key, -rmCnt); err != nil {
 		return 0, err
 	}
-	if err = t.Commit(); err != nil {
+	if err = t.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -631,7 +631,7 @@ func (db *DBZSet) Persist(ctx context.Context, key []byte) (int64, error) {
 		return 0, err
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return n, err
 }
 
@@ -716,7 +716,7 @@ func (db *DBZSet) ZUnionStore(ctx context.Context, destKey []byte, srcKeys [][]b
 	sk := db.zEncodeSizeKey(destKey)
 	t.Put(sk, PutInt64(n))
 
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 	return n, nil
@@ -784,7 +784,7 @@ func (db *DBZSet) ZInterStore(ctx context.Context, destKey []byte, srcKeys [][]b
 	sk := db.zEncodeSizeKey(destKey)
 	t.Put(sk, PutInt64(n))
 
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 	return n, nil
@@ -857,7 +857,7 @@ func (db *DBZSet) ZRemRangeByLex(ctx context.Context, key []byte, min []byte, ma
 		return 0, err
 	}
 
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -911,7 +911,7 @@ func (db *DBZSet) zExpireAt(ctx context.Context, key []byte, when int64) (int64,
 	}
 
 	db.expireAt(t, ZSetType, key, when)
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 

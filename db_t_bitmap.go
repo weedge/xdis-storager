@@ -99,7 +99,7 @@ func (db *DBBitmap) BitOP(ctx context.Context, op string, destKey []byte, srcKey
 
 	t.Put(key, value)
 
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -233,7 +233,7 @@ func (db *DBBitmap) SetBit(ctx context.Context, key []byte, offset int, on int) 
 	value[byteOffset] = byteVal
 
 	t.Put(key, value)
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 

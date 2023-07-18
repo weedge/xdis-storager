@@ -1,6 +1,8 @@
 package driver
 
 import (
+	"context"
+
 	"github.com/weedge/pkg/driver"
 	openkvDriver "github.com/weedge/pkg/driver/openkv"
 	"github.com/weedge/xdis-storager/openkv"
@@ -27,5 +29,5 @@ type IKV interface {
 }
 
 type ICommitter interface {
-	Commit(*openkv.WriteBatch) error
+	Commit(context.Context, *openkv.WriteBatch) error
 }

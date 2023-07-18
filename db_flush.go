@@ -7,7 +7,7 @@ import (
 
 // FlushDB flushes the data.
 func (db *DB) FlushDB(ctx context.Context) (drop int64, err error) {
-	all := [](func() (int64, error)){
+	all := [](func(ctx context.Context) (int64, error)){
 		db.stringFlush,
 		db.listFlush,
 		db.hashFlush,
@@ -16,7 +16,7 @@ func (db *DB) FlushDB(ctx context.Context) (drop int64, err error) {
 	}
 
 	for _, flush := range all {
-		n, e := flush()
+		n, e := flush(ctx)
 		if e != nil {
 			err = e
 			return
@@ -28,7 +28,7 @@ func (db *DB) FlushDB(ctx context.Context) (drop int64, err error) {
 	return
 }
 
-func (db *DB) flushType(t *Batch, dataType byte) (drop int64, err error) {
+func (db *DB) flushType(ctx context.Context, t *Batch, dataType byte) (drop int64, err error) {
 	var deleteFunc func(t *Batch, key []byte) (int64, error)
 	var metaDataType byte
 	switch dataType {
@@ -59,7 +59,7 @@ func (db *DB) flushType(t *Batch, dataType byte) (drop int64, err error) {
 			db.rmExpire(t, dataType, key)
 		}
 
-		if err = t.Commit(); err != nil {
+		if err = t.Commit(ctx); err != nil {
 			return
 		}
 
@@ -69,38 +69,38 @@ func (db *DB) flushType(t *Batch, dataType byte) (drop int64, err error) {
 	return
 }
 
-func (db *DB) stringFlush() (drop int64, err error) {
+func (db *DB) stringFlush(ctx context.Context) (drop int64, err error) {
 	t := db.string.batch
 	t.Lock()
 	defer t.Unlock()
-	return db.flushType(t, StringType)
+	return db.flushType(ctx, t, StringType)
 }
 
-func (db *DB) listFlush() (drop int64, err error) {
+func (db *DB) listFlush(ctx context.Context) (drop int64, err error) {
 	t := db.list.batch
 	t.Lock()
 	defer t.Unlock()
-	return db.flushType(t, ListType)
+	return db.flushType(ctx, t, ListType)
 }
 
-func (db *DB) hashFlush() (drop int64, err error) {
+func (db *DB) hashFlush(ctx context.Context) (drop int64, err error) {
 	t := db.hash.batch
 	t.Lock()
 	defer t.Unlock()
-	return db.flushType(t, HashType)
+	return db.flushType(ctx, t, HashType)
 }
 
-func (db *DB) setFlush() (drop int64, err error) {
+func (db *DB) setFlush(ctx context.Context) (drop int64, err error) {
 	t := db.set.batch
 	t.Lock()
 	defer t.Unlock()
 
-	return db.flushType(t, SetType)
+	return db.flushType(ctx, t, SetType)
 }
 
-func (db *DB) zsetFlush() (drop int64, err error) {
+func (db *DB) zsetFlush(ctx context.Context) (drop int64, err error) {
 	t := db.zset.batch
 	t.Lock()
 	defer t.Unlock()
-	return db.flushType(t, ZSetType)
+	return db.flushType(ctx, t, ZSetType)
 }

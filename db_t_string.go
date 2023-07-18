@@ -62,7 +62,7 @@ func (db *DBString) Set(ctx context.Context, key []byte, value []byte) error {
 
 	db.batch.Put(key, value)
 
-	err = db.batch.Commit()
+	err = db.batch.Commit(ctx)
 
 	return err
 }
@@ -112,7 +112,7 @@ func (db *DBString) GetSet(ctx context.Context, key []byte, value []byte) ([]byt
 
 	t.Put(key, value)
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 
 	return oldValue, err
 }
@@ -160,7 +160,7 @@ func (db *DBString) incr(ctx context.Context, key []byte, delta int64) (int64, e
 
 	t.Put(key, strconv.AppendInt(nil, n, 10))
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return n, err
 }
 
@@ -212,7 +212,7 @@ func (db *DBString) MSet(ctx context.Context, args ...driver.KVPair) error {
 
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return err
 }
 
@@ -239,7 +239,7 @@ func (db *DBString) SetNX(ctx context.Context, key []byte, value []byte) (n int6
 	}
 
 	t.Put(key, value)
-	err = t.Commit()
+	err = t.Commit(ctx)
 	if err != nil {
 		return
 	}
@@ -267,7 +267,7 @@ func (db *DBString) SetEX(ctx context.Context, key []byte, duration int64, value
 	t.Put(ek, value)
 	db.expireAt(t, StringType, key, time.Now().Unix()+duration)
 
-	return t.Commit()
+	return t.Commit(ctx)
 }
 
 // SetNXEX set k v nx ex seconds
@@ -297,7 +297,7 @@ func (db *DBString) SetNXEX(ctx context.Context, key []byte, duration int64, val
 
 	t.Put(ek, value)
 	db.expireAt(t, StringType, key, time.Now().Unix()+duration)
-	err = t.Commit()
+	err = t.Commit(ctx)
 	if err != nil {
 		return
 	}
@@ -332,7 +332,7 @@ func (db *DBString) SetXXEX(ctx context.Context, key []byte, duration int64, val
 
 	t.Put(ek, value)
 	db.expireAt(t, StringType, key, time.Now().Unix()+duration)
-	err = t.Commit()
+	err = t.Commit(ctx)
 	if err != nil {
 		return
 	}
@@ -368,7 +368,7 @@ func (db *DBString) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 		db.rmExpire(t, StringType, k)
 	}
 
-	err := t.Commit()
+	err := t.Commit(ctx)
 	return int64(nums), err
 }
 
@@ -418,7 +418,7 @@ func (db *DBString) setExpireAt(ctx context.Context, key []byte, when int64) (in
 	}
 
 	db.expireAt(t, StringType, key, when)
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -457,7 +457,7 @@ func (db *DBString) Persist(ctx context.Context, key []byte) (int64, error) {
 		return 0, err
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return n, err
 }
 
@@ -494,7 +494,7 @@ func (db *DBString) SetRange(ctx context.Context, key []byte, offset int, value 
 
 	t.Put(key, oldValue)
 
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -591,7 +591,7 @@ func (db *DBString) Append(ctx context.Context, key []byte, value []byte) (int64
 
 	t.Put(key, oldValue)
 
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, nil
 	}
 

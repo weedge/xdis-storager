@@ -1,6 +1,7 @@
 package storager
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -56,7 +57,7 @@ func (c *TTLChecker) setNextCheckTime(when int64, force bool) {
 	c.Unlock()
 }
 
-func (c *TTLChecker) check() {
+func (c *TTLChecker) check(ctx context.Context) {
 	now := time.Now().Unix()
 
 	c.Lock()
@@ -101,7 +102,7 @@ func (c *TTLChecker) check() {
 				cb(t, k)
 				t.Delete(tk)
 				t.Delete(mk)
-				t.Commit()
+				t.Commit(ctx)
 			}
 
 		}

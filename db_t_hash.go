@@ -72,7 +72,7 @@ func (db *DBHash) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 		db.rmExpire(t, HashType, key)
 	}
 
-	err := t.Commit()
+	err := t.Commit(ctx)
 	return int64(nums), err
 }
 
@@ -142,7 +142,7 @@ func (db *DBHash) HSet(ctx context.Context, key []byte, field []byte, value []by
 		return 0, err
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return n, err
 }
 
@@ -184,7 +184,7 @@ func (db *DBHash) HMset(ctx context.Context, key []byte, args ...driver.FVPair) 
 		return err
 	}
 
-	err := t.Commit()
+	err := t.Commit(ctx)
 	return err
 }
 
@@ -244,7 +244,7 @@ func (db *DBHash) HDel(ctx context.Context, key []byte, args ...[]byte) (int64, 
 		return 0, err
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 
 	return num, err
 }
@@ -275,7 +275,7 @@ func (db *DBHash) HIncrBy(ctx context.Context, key []byte, field []byte, delta i
 		return 0, err
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 
 	return n, err
 }
@@ -367,7 +367,7 @@ func (db *DBHash) hExpireAt(ctx context.Context, key []byte, when int64) (int64,
 	}
 
 	db.expireAt(t, HashType, key, when)
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -425,7 +425,7 @@ func (db *DBHash) Persist(ctx context.Context, key []byte) (int64, error) {
 		return 0, err
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return n, err
 }
 
@@ -458,6 +458,6 @@ func (db *DBHash) Clear(ctx context.Context, key []byte) (int64, error) {
 	}
 	db.rmExpire(t, HashType, key)
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return num, err
 }

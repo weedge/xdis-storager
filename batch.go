@@ -1,6 +1,7 @@
 package storager
 
 import (
+	"context"
 	"sync"
 
 	"github.com/weedge/xdis-storager/openkv"
@@ -18,9 +19,9 @@ func NewBatch(store *Storager, wb *openkv.WriteBatch, locker sync.Locker) *Batch
 	return &Batch{store: store, WriteBatch: wb, Locker: locker}
 }
 
-func (b *Batch) Commit() error {
+func (b *Batch) Commit(ctx context.Context) error {
 	if b.store != nil && b.store.committer != nil {
-		return b.store.committer.Commit(b.WriteBatch)
+		return b.store.committer.Commit(ctx, b.WriteBatch)
 	}
 
 	b.store.commitLock.Lock()

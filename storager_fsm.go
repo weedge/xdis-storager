@@ -3,6 +3,7 @@ package storager
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
 
@@ -26,7 +27,7 @@ func (h *SnapshotHead) Write(w io.Writer) error {
 }
 
 // SaveSnapshotWithHead dumps data to the Writer with SnapshotHead
-func (s *Storager) SaveSnapshotWithHead(h *SnapshotHead, w io.Writer) (err error) {
+func (s *Storager) SaveSnapshotWithHead(ctx context.Context, h *SnapshotHead, w io.Writer) (err error) {
 	var snap *openkv.Snapshot
 
 	s.wLock.Lock()
@@ -83,12 +84,12 @@ func (s *Storager) SaveSnapshotWithHead(h *SnapshotHead, w io.Writer) (err error
 
 // RecoverFromSnapshotWithHead clears all data and loads dump file to db
 // return snapshot head info,error
-func (s *Storager) RecoverFromSnapshotWithHead(r io.Reader) (h *SnapshotHead, err error) {
+func (s *Storager) RecoverFromSnapshotWithHead(ctx context.Context, r io.Reader) (h *SnapshotHead, err error) {
 	s.wLock.Lock()
 	defer s.wLock.Unlock()
 
 	// clear all data
-	if err = s.flushAll(); err != nil {
+	if err = s.flushAll(ctx); err != nil {
 		return nil, err
 	}
 

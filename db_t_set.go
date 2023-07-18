@@ -79,7 +79,7 @@ func (db *DBSet) sExpireAt(ctx context.Context, key []byte, when int64) (int64, 
 		return 0, err
 	}
 	db.expireAt(t, SetType, key, when)
-	if err := t.Commit(); err != nil {
+	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}
 
@@ -122,7 +122,7 @@ func (db *DBSet) SAdd(ctx context.Context, key []byte, args ...[]byte) (int64, e
 		return 0, err
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return num, err
 
 }
@@ -348,7 +348,7 @@ func (db *DBSet) SRem(ctx context.Context, key []byte, args ...[]byte) (int64, e
 		return 0, err
 	}
 
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return num, err
 
 }
@@ -435,7 +435,7 @@ func (db *DBSet) sStoreGeneric(ctx context.Context, dstKey []byte, optType byte,
 	sk := db.sEncodeSizeKey(dstKey)
 	t.Put(sk, PutInt64(n))
 
-	if err = t.Commit(); err != nil {
+	if err = t.Commit(ctx); err != nil {
 		return 0, err
 	}
 	return n, nil
@@ -463,7 +463,7 @@ func (db *DBSet) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 		db.rmExpire(t, SetType, key)
 	}
 
-	err := t.Commit()
+	err := t.Commit(ctx)
 	return int64(nums), err
 }
 
@@ -532,6 +532,6 @@ func (db *DBSet) Persist(ctx context.Context, key []byte) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	err = t.Commit()
+	err = t.Commit(ctx)
 	return n, err
 }

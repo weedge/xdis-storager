@@ -60,7 +60,7 @@ func (store *Storager) Open(ctx context.Context) (err error) {
 	defer func() {
 		if err != nil {
 			if e := store.Close(); e != nil {
-				klog.Errorf("close store err: %s", e.Error())
+				klog.CtxErrorf(ctx, "close store err: %s", e.Error())
 			}
 		}
 	}()
@@ -83,7 +83,7 @@ func (store *Storager) Open(ctx context.Context) (err error) {
 	store.dbs = make(map[int]*DB, opts.Databases)
 	store.quit = make(chan struct{})
 
-	store.checkTTL()
+	store.checkTTL(ctx)
 
 	return
 }
@@ -170,7 +170,7 @@ func (m *Storager) Select(ctx context.Context, index int) (idb driver.IDB, err e
 	return
 }
 
-func (m *Storager) checkTTL() {
+func (m *Storager) checkTTL(ctx context.Context) {
 	m.ttlCheckers = make([]*TTLChecker, 0, config.DefaultDatabases)
 	m.ttlCheckerCh = make(chan *TTLChecker, config.DefaultDatabases)
 
@@ -182,11 +182,11 @@ func (m *Storager) checkTTL() {
 			select {
 			case <-tick.C:
 				for _, c := range m.ttlCheckers {
-					c.check()
+					c.check(ctx)
 				}
 			case c := <-m.ttlCheckerCh:
 				m.ttlCheckers = append(m.ttlCheckers, c)
-				c.check()
+				c.check(ctx)
 			case <-m.quit:
 				return
 			}
@@ -199,10 +199,10 @@ func (m *Storager) FlushAll(ctx context.Context) error {
 	m.wLock.Lock()
 	defer m.wLock.Unlock()
 
-	return m.flushAll()
+	return m.flushAll(ctx)
 }
 
-func (m *Storager) flushAll() (err error) {
+func (m *Storager) flushAll(ctx context.Context) (err error) {
 	it := m.odb.NewIterator()
 	defer it.Close()
 
@@ -218,7 +218,7 @@ func (m *Storager) flushAll() (err error) {
 		n++
 		if n == 10000 {
 			if err = w.Commit(); err != nil {
-				klog.Errorf("flush all commit error: %s", err.Error())
+				klog.CtxErrorf(ctx, "flush all commit error: %s", err.Error())
 				return
 			}
 			n = 0
@@ -227,7 +227,7 @@ func (m *Storager) flushAll() (err error) {
 	}
 
 	if err = w.Commit(); err != nil {
-		klog.Errorf("flush all commit error: %s", err.Error())
+		klog.CtxErrorf(ctx, "flush all commit error: %s", err.Error())
 		return
 	}
 
