@@ -1,19 +1,27 @@
 package config
 
 type StorgerOptions struct {
-	DataDir          string `mapstructure:"dataDir"`
-	Databases        int    `mapstructure:"databases"`
-	KVStoreName      string `mapstructure:"kvStoreName"`
-	DBPath           string `mapstructure:"dbPath"`
-	DBSyncCommit     int    `mapstructure:"dbSyncCommit"`
-	TTLCheckInterval int    `mapstructure:"ttlCheckInterval"`
+	OpenkvOptions    `mapstructure:",squash"`
+	Databases        int `mapstructure:"databases"`
+	TTLCheckInterval int `mapstructure:"ttlCheckInterval"`
+}
+type OpenkvOptions struct {
+	DataDir      string `mapstructure:"dataDir"`
+	KVStoreName  string `mapstructure:"kvStoreName"`
+	DBPath       string `mapstructure:"dbPath"`
+	DBSyncCommit int    `mapstructure:"dbSyncCommit"`
 }
 
 func DefaultStoragerOptions() *StorgerOptions {
 	return &StorgerOptions{
-		DataDir:          DefaultDataDir,
+		OpenkvOptions:    *DefaultOpenkvOptions(),
 		Databases:        DefaultDatabases,
-		KVStoreName:      DefaultKVStoreName,
 		TTLCheckInterval: DefaultTTLCheckInterval,
+	}
+}
+func DefaultOpenkvOptions() *OpenkvOptions {
+	return &OpenkvOptions{
+		DataDir:     DefaultDataDir,
+		KVStoreName: DefaultKVStoreName,
 	}
 }

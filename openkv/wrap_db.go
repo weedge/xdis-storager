@@ -14,7 +14,7 @@ import (
 // impl IKV
 type DB struct {
 	// store common conf
-	opts *config.StorgerOptions
+	opts *config.OpenkvOptions
 	// kv op interface
 	openkvDriver.IDB
 	// kv store engine name

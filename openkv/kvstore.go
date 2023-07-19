@@ -9,7 +9,7 @@ import (
 	"github.com/weedge/xdis-storager/config"
 )
 
-func initStorePath(opts *config.StorgerOptions) (p string, err error) {
+func initStorePath(opts *config.OpenkvOptions) (p string, err error) {
 	p = opts.DBPath
 	if len(opts.DBPath) == 0 {
 		p = path.Join(opts.DataDir, fmt.Sprintf("%s_data", opts.KVStoreName))
@@ -22,7 +22,7 @@ func initStorePath(opts *config.StorgerOptions) (p string, err error) {
 	return
 }
 
-func Open(opts *config.StorgerOptions) (db *DB, err error) {
+func Open(opts *config.OpenkvOptions) (db *DB, err error) {
 	store, err := driver.GetStore(opts.KVStoreName)
 	if err != nil {
 		return
@@ -47,7 +47,7 @@ func Open(opts *config.StorgerOptions) (db *DB, err error) {
 	return
 }
 
-func Repair(opts *config.StorgerOptions) (err error) {
+func Repair(opts *config.OpenkvOptions) (err error) {
 	s, err := driver.GetStore(opts.KVStoreName)
 	if err != nil {
 		return

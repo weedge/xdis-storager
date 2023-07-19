@@ -76,7 +76,7 @@ func (store *Storager) Open(ctx context.Context) (err error) {
 		return err
 	}
 
-	if store.odb, err = openkv.Open(opts); err != nil {
+	if store.odb, err = openkv.Open(&opts.OpenkvOptions); err != nil {
 		return
 	}
 
