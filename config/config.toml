@@ -1,0 +1,30 @@
+# Data store path, all wedisdb's data will be saved here
+dataDir = "./data"
+
+# Set the number of databases. You can use `select dbindex` to choose a db.
+# dbindex must be in [0, databases - 1].
+# Default databases is 16, maximum is 10240 now.
+databases = 16
+
+# set the number of slots, 
+# Default slots is 1024
+# set slots<0, don't use slots
+slots = -1
+
+# Sync commit to disk if possible
+#  0: no sync
+#  1: sync every second
+#  2: sync every commit
+dbSyncCommit = 0
+
+# checking TTL (time to live) data every n seconds
+# if you set big, the expired data may not be deleted immediately
+ttlCheckInterval = 1
+
+# Choose which backend storage to use, 
+# impl openkv driver register to support:
+# if store engine have tag, need add tag
+kvStoreName = "goleveldb.kvStore"
+
+# If not set, use dataDir/"kvStoreName"_data
+dbPath = ""

@@ -3,6 +3,7 @@ package config
 type StorgerOptions struct {
 	OpenkvOptions    `mapstructure:",squash"`
 	Databases        int `mapstructure:"databases"`
+	Slots            int `mapstructure:"slots"`
 	TTLCheckInterval int `mapstructure:"ttlCheckInterval"`
 }
 type OpenkvOptions struct {
@@ -16,6 +17,7 @@ func DefaultStoragerOptions() *StorgerOptions {
 	return &StorgerOptions{
 		OpenkvOptions:    *DefaultOpenkvOptions(),
 		Databases:        DefaultDatabases,
+		Slots:            DefaulSlots,
 		TTLCheckInterval: DefaultTTLCheckInterval,
 	}
 }

@@ -158,6 +158,9 @@ var (
 
 	// For different common errors
 	ErrScoreMiss = errors.New("ERR zset score miss")
+
+	// For slots
+	ErrUnsupportSlots = errors.New("unsupport slots")
 )
 
 // For list op

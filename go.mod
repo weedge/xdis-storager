@@ -8,7 +8,7 @@ require (
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
 	github.com/stretchr/testify v1.8.3
 	github.com/syndtr/goleveldb v1.0.0
-	github.com/weedge/pkg v0.0.0-20230619110950-673148e3b843
+	github.com/weedge/pkg v0.0.0-20230724165101-0203f2a21e21
 )
 
 require (

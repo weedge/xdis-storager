@@ -16,6 +16,8 @@ type DB struct {
 	index int
 	// database index to varint buffer
 	indexVarBuf []byte
+	// database index + slot to varint buffer
+	indexSlotVarBuf []byte
 	// IKV impl
 	kvDriver.IKV
 
@@ -91,4 +93,18 @@ func (db *DB) SetIndex(index int) {
 	n := binary.PutUvarint(buf, uint64(index))
 
 	db.indexVarBuf = buf[0:n]
+	db.indexSlotVarBuf = buf[0:n]
+}
+
+// SetSlots set the slot of key.
+func (db *DB) SetSlots(key []byte) {
+	if db.store.opts.Slots < 0 {
+		return
+	}
+	_, slot := db.store.HashKeyToSlot(key)
+	// the most size for varint is 10 bytes
+	buf := make([]byte, 10)
+	n := binary.PutUvarint(buf, uint64(slot))
+
+	db.indexSlotVarBuf = utils.ConcatBytes([][]byte{db.indexVarBuf, buf[0:n]})
 }
