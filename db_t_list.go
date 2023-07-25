@@ -66,6 +66,7 @@ func (db *DBList) delete(t *Batch, key []byte) (num int64, err error) {
 	}
 
 	t.Delete(mk)
+	db.DelKeyMeta(t, key, ListType)
 
 	return num, nil
 }
@@ -172,7 +173,7 @@ func (db *DBList) lpush(ctx context.Context, key []byte, whereSeq int32, args ..
 	}
 
 	db.lSetMeta(metaKey, headSeq, tailSeq)
-
+	db.SetKeyMeta(t, key, ListType)
 	err = t.Commit(ctx)
 
 	if err == nil {
@@ -232,6 +233,7 @@ func (db *DBList) lpop(ctx context.Context, key []byte, whereSeq int32) ([]byte,
 		db.rmExpire(t, ListType, key)
 	}
 
+	db.SetKeyMeta(t, key, ListType)
 	err = t.Commit(ctx)
 	return value, err
 }
@@ -286,6 +288,7 @@ func (db *DBList) ltrim2(ctx context.Context, key []byte, startP, stopP int64) (
 	}
 
 	db.lSetMeta(ek, headSeq+start, headSeq+stop)
+	db.SetKeyMeta(t, key, ListType)
 
 	return t.Commit(ctx)
 }
@@ -343,6 +346,7 @@ func (db *DBList) ltrim(ctx context.Context, key []byte, trimSize, whereSeq int3
 	if size == 0 {
 		db.rmExpire(t, ListType, key)
 	}
+	db.SetKeyMeta(t, key, ListType)
 
 	err = t.Commit(ctx)
 	return trimEndSeq - trimStartSeq + 1, err
@@ -448,6 +452,7 @@ func (db *DBList) LSet(ctx context.Context, key []byte, index int32, value []byt
 	}
 	sk := db.lEncodeListKey(key, seq)
 	t.Put(sk, value)
+	db.SetKeyMeta(t, key, ListType)
 	err = t.Commit(ctx)
 	return err
 }

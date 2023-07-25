@@ -98,6 +98,7 @@ func (db *DBBitmap) BitOP(ctx context.Context, op string, destKey []byte, srcKey
 	defer t.Unlock()
 
 	t.Put(key, value)
+	db.SetKeyMeta(t, destKey, StringType)
 
 	if err := t.Commit(ctx); err != nil {
 		return 0, err
@@ -211,8 +212,8 @@ func (db *DBBitmap) SetBit(ctx context.Context, key []byte, offset int, on int) 
 	t.Lock()
 	defer t.Unlock()
 
-	key = db.encodeStringKey(key)
-	value, err := db.IKV.Get(key)
+	ek := db.encodeStringKey(key)
+	value, err := db.IKV.Get(ek)
 	if err != nil {
 		return 0, err
 	}
@@ -232,7 +233,8 @@ func (db *DBBitmap) SetBit(ctx context.Context, key []byte, offset int, on int) 
 
 	value[byteOffset] = byteVal
 
-	t.Put(key, value)
+	t.Put(ek, value)
+	db.SetKeyMeta(t, key, StringType)
 	if err := t.Commit(ctx); err != nil {
 		return 0, err
 	}

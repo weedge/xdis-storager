@@ -28,6 +28,7 @@ func NewDBString(db *DB) *DBString {
 func (db *DBString) delete(t *Batch, key []byte) (int64, error) {
 	key = db.encodeStringKey(key)
 	t.Delete(key)
+	db.DelKeyMeta(t, key, StringType)
 	return 1, nil
 }
 
@@ -55,12 +56,13 @@ func (db *DBString) Set(ctx context.Context, key []byte, value []byte) error {
 	}
 
 	var err error
-	key = db.encodeStringKey(key)
+	ek := db.encodeStringKey(key)
 
 	db.batch.Lock()
 	defer db.batch.Unlock()
 
-	db.batch.Put(key, value)
+	db.batch.Put(ek, value)
+	db.SetKeyMeta(db.batch, key, StringType)
 
 	err = db.batch.Commit(ctx)
 
@@ -98,20 +100,20 @@ func (db *DBString) GetSet(ctx context.Context, key []byte, value []byte) ([]byt
 		return nil, err
 	}
 
-	key = db.encodeStringKey(key)
+	ek := db.encodeStringKey(key)
 
 	t := db.batch
 
 	t.Lock()
 	defer t.Unlock()
 
-	oldValue, err := db.IKV.Get(key)
+	oldValue, err := db.IKV.Get(ek)
 	if err != nil {
 		return nil, err
 	}
 
-	t.Put(key, value)
-
+	t.Put(ek, value)
+	db.SetKeyMeta(t, key, StringType)
 	err = t.Commit(ctx)
 
 	return oldValue, err
@@ -143,7 +145,7 @@ func (db *DBString) incr(ctx context.Context, key []byte, delta int64) (int64, e
 	}
 
 	var err error
-	key = db.encodeStringKey(key)
+	ek := db.encodeStringKey(key)
 
 	t := db.batch
 
@@ -151,15 +153,15 @@ func (db *DBString) incr(ctx context.Context, key []byte, delta int64) (int64, e
 	defer t.Unlock()
 
 	var n int64
-	n, err = utils.StrInt64(db.IKV.Get(key))
+	n, err = utils.StrInt64(db.IKV.Get(ek))
 	if err != nil {
 		return 0, ErrValueIntOutOfRange
 	}
 
 	n += delta
 
-	t.Put(key, strconv.AppendInt(nil, n, 10))
-
+	t.Put(ek, strconv.AppendInt(nil, n, 10))
+	db.SetKeyMeta(t, key, StringType)
 	err = t.Commit(ctx)
 	return n, err
 }
@@ -209,6 +211,7 @@ func (db *DBString) MSet(ctx context.Context, args ...driver.KVPair) error {
 		value = args[i].Value
 
 		t.Put(key, value)
+		db.SetKeyMeta(t, args[i].Key, StringType)
 
 	}
 
@@ -225,20 +228,21 @@ func (db *DBString) SetNX(ctx context.Context, key []byte, value []byte) (n int6
 		return
 	}
 
-	key = db.encodeStringKey(key)
+	ek := db.encodeStringKey(key)
 	n = 1
 
 	t := db.batch
 	t.Lock()
 	defer t.Unlock()
 
-	if v, err := db.IKV.Get(key); err != nil {
+	if v, err := db.IKV.Get(ek); err != nil {
 		return 0, err
 	} else if v != nil {
 		return 0, nil
 	}
 
-	t.Put(key, value)
+	t.Put(ek, value)
+	db.SetKeyMeta(t, key, StringType)
 	err = t.Commit(ctx)
 	if err != nil {
 		return
@@ -265,6 +269,7 @@ func (db *DBString) SetEX(ctx context.Context, key []byte, duration int64, value
 	defer t.Unlock()
 
 	t.Put(ek, value)
+	db.SetKeyMeta(t, key, StringType)
 	db.expireAt(t, StringType, key, time.Now().Unix()+duration)
 
 	return t.Commit(ctx)
@@ -296,6 +301,7 @@ func (db *DBString) SetNXEX(ctx context.Context, key []byte, duration int64, val
 	}
 
 	t.Put(ek, value)
+	db.SetKeyMeta(t, key, StringType)
 	db.expireAt(t, StringType, key, time.Now().Unix()+duration)
 	err = t.Commit(ctx)
 	if err != nil {
@@ -331,6 +337,7 @@ func (db *DBString) SetXXEX(ctx context.Context, key []byte, duration int64, val
 	}
 
 	t.Put(ek, value)
+	db.SetKeyMeta(t, key, StringType)
 	db.expireAt(t, StringType, key, time.Now().Unix()+duration)
 	err = t.Commit(ctx)
 	if err != nil {
@@ -473,14 +480,14 @@ func (db *DBString) SetRange(ctx context.Context, key []byte, offset int, value 
 		return 0, ErrValueSize
 	}
 
-	key = db.encodeStringKey(key)
+	ek := db.encodeStringKey(key)
 
 	t := db.batch
 
 	t.Lock()
 	defer t.Unlock()
 
-	oldValue, err := db.IKV.Get(key)
+	oldValue, err := db.IKV.Get(ek)
 	if err != nil {
 		return 0, err
 	}
@@ -492,7 +499,8 @@ func (db *DBString) SetRange(ctx context.Context, key []byte, offset int, value 
 
 	copy(oldValue[offset:], value)
 
-	t.Put(key, oldValue)
+	t.Put(ek, oldValue)
+	db.SetKeyMeta(t, key, StringType)
 
 	if err := t.Commit(ctx); err != nil {
 		return 0, err
@@ -571,14 +579,14 @@ func (db *DBString) Append(ctx context.Context, key []byte, value []byte) (int64
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
-	key = db.encodeStringKey(key)
+	ek := db.encodeStringKey(key)
 
 	t := db.batch
 
 	t.Lock()
 	defer t.Unlock()
 
-	oldValue, err := db.IKV.Get(key)
+	oldValue, err := db.IKV.Get(ek)
 	if err != nil {
 		return 0, err
 	}
@@ -589,7 +597,8 @@ func (db *DBString) Append(ctx context.Context, key []byte, value []byte) (int64
 
 	oldValue = append(oldValue, value...)
 
-	t.Put(key, oldValue)
+	t.Put(ek, oldValue)
+	db.SetKeyMeta(t, key, StringType)
 
 	if err := t.Commit(ctx); err != nil {
 		return 0, nil

@@ -45,6 +45,7 @@ func (db *DBSet) delete(t *Batch, key []byte) (num int64, err error) {
 
 	it.Close()
 	t.Delete(sk)
+	db.DelKeyMeta(t, key, SetType)
 
 	return num, nil
 }
@@ -122,6 +123,7 @@ func (db *DBSet) SAdd(ctx context.Context, key []byte, args ...[]byte) (int64, e
 		return 0, err
 	}
 
+	db.SetKeyMeta(t, key, SetType)
 	err = t.Commit(ctx)
 	return num, err
 
@@ -434,6 +436,7 @@ func (db *DBSet) sStoreGeneric(ctx context.Context, dstKey []byte, optType byte,
 	var n = int64(len(v))
 	sk := db.sEncodeSizeKey(dstKey)
 	t.Put(sk, PutInt64(n))
+	db.SetKeyMeta(t, dstKey, SetType)
 
 	if err = t.Commit(ctx); err != nil {
 		return 0, err

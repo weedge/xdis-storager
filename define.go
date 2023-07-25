@@ -77,17 +77,17 @@ const (
 	NoneType byte = iota
 	StringType
 
-	HashType
 	HSizeType
+	HashType
 
-	ListType
 	LMetaType
+	ListType
 
-	SetType
 	SSizeType
+	SetType
 
-	ZSetType
 	ZSizeType
+	ZSetType
 	ZScoreType
 
 	ExpTimeType
@@ -223,5 +223,13 @@ const (
 const (
 	MaxVarintLen16 = 3
 	MaxVarintLen32 = 5
+	// the most size for varint is 10 bytes
 	MaxVarintLen64 = 10
+)
+
+const (
+	CodeTypeMeta byte = '@'
+	CodeTypeData byte = '$'
+
+	Version byte = 0
 )

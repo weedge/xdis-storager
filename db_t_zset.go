@@ -39,6 +39,7 @@ func (db *DBZSet) delete(t *Batch, key []byte) (num int64, err error) {
 	num, err = db.zRemRange(t, key, MinScore, MaxScore, 0, -1)
 	sizeKey := db.zEncodeSizeKey(key)
 	t.Delete(sizeKey)
+	db.DelKeyMeta(t, key, ZSetType)
 	return
 }
 
@@ -169,6 +170,8 @@ func (db *DBZSet) zSetItem(t *Batch, key []byte, score int64, member []byte) (in
 
 	sk := db.zEncodeScoreKey(key, member, score)
 	t.Put(sk, []byte{})
+
+	db.SetKeyMeta(t, key, ZSetType)
 
 	return exists, nil
 }
@@ -309,6 +312,8 @@ func (db *DBZSet) ZIncrBy(ctx context.Context, key []byte, delta int64, member [
 		oldSk := db.zEncodeScoreKey(key, member, oldScore)
 		t.Delete(oldSk)
 	}
+
+	db.SetKeyMeta(t, key, ZSetType)
 
 	err = t.Commit(ctx)
 	return newScore, err

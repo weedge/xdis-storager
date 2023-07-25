@@ -93,8 +93,7 @@ func (db *DB) IndexVarBuf() []byte {
 // SetIndex set the index of database.
 func (db *DB) SetIndex(index int) {
 	db.index = index
-	// the most size for varint is 10 bytes
-	buf := make([]byte, 10)
+	buf := make([]byte, MaxVarintLen64)
 	n := binary.PutUvarint(buf, uint64(index))
 
 	db.indexVarBuf = buf[0:n]

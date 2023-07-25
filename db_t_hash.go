@@ -45,6 +45,7 @@ func (db *DBHash) delete(t *Batch, key []byte) (num int64, err error) {
 	}
 	it.Close()
 	t.Delete(sk)
+	db.DelKeyMeta(t, key, HashType)
 
 	return num, nil
 }
@@ -89,7 +90,7 @@ func (db *DBHash) hSetItem(ctx context.Context, key []byte, field []byte, value 
 			return 0, err
 		}
 	}
-
+	db.SetKeyMeta(t, key, HashType)
 	t.Put(ek, value)
 	return n, nil
 }
@@ -184,6 +185,7 @@ func (db *DBHash) HMset(ctx context.Context, key []byte, args ...driver.FVPair) 
 		return err
 	}
 
+	db.SetKeyMeta(t, key, HashType)
 	err := t.Commit(ctx)
 	return err
 }
