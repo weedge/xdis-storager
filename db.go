@@ -16,8 +16,6 @@ type DB struct {
 	index int
 	// database index to varint buffer
 	indexVarBuf []byte
-	// database index + slot to varint buffer
-	indexSlotVarBuf []byte
 	// IKV impl
 	kvDriver.IKV
 
@@ -27,6 +25,8 @@ type DB struct {
 	set    *DBSet
 	zset   *DBZSet
 	bitmap *DBBitmap
+
+	slot *DBSlot
 
 	ttlChecker *TTLChecker
 }
@@ -43,6 +43,7 @@ func NewDB(store *Storager, idx int) *DB {
 	db.zset = NewDBZSet(db)
 	db.bitmap = NewDBBitmap(db)
 
+	db.slot = NewDBSlot(db)
 	db.ttlChecker = NewTTLChecker(db)
 
 	return db
@@ -65,6 +66,10 @@ func (m *DB) DBZSet() driver.IZsetCmd {
 }
 func (m *DB) DBBitmap() driver.IBitmapCmd {
 	return m.bitmap
+}
+
+func (m *DB) DBSlot() driver.ISlotsCmd {
+	return m.slot
 }
 
 func (m *DB) Close() (err error) {
@@ -93,18 +98,4 @@ func (db *DB) SetIndex(index int) {
 	n := binary.PutUvarint(buf, uint64(index))
 
 	db.indexVarBuf = buf[0:n]
-	db.indexSlotVarBuf = buf[0:n]
-}
-
-// SetSlots set the slot of key.
-func (db *DB) SetSlots(key []byte) {
-	if db.store.opts.Slots < 0 {
-		return
-	}
-	_, slot := db.store.HashKeyToSlot(key)
-	// the most size for varint is 10 bytes
-	buf := make([]byte, 10)
-	n := binary.PutUvarint(buf, uint64(slot))
-
-	db.indexSlotVarBuf = utils.ConcatBytes([][]byte{db.indexVarBuf, buf[0:n]})
 }

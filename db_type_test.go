@@ -44,3 +44,10 @@ func TestDBZSet_Implements(t *testing.T) {
 		t.Fatalf("does not implement driver.IZsetCmd")
 	}
 }
+
+func TestDBSLot_Implements(t *testing.T) {
+	var i interface{} = &DBSlot{}
+	if _, ok := i.(driver.ISlotsCmd); !ok {
+		t.Fatalf("does not implement driver.ISlotsCmd")
+	}
+}

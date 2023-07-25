@@ -218,3 +218,10 @@ const (
 const (
 	RegisterStoragerName = "xdis-storager"
 )
+
+// MaxVarintLenN is the maximum length of a varint-encoded N-bit integer.
+const (
+	MaxVarintLen16 = 3
+	MaxVarintLen32 = 5
+	MaxVarintLen64 = 10
+)

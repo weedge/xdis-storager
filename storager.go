@@ -161,9 +161,9 @@ func (m *Storager) Select(ctx context.Context, index int) (idb driver.IDB, err e
 
 	// async send checker,
 	// if recv checkTTL tick to check,ch full, maybe block
-	go func(db *DB) {
+	go func() {
 		m.ttlCheckerCh <- db.ttlChecker
-	}(db)
+	}()
 	idb = db
 	m.dbLock.Unlock()
 

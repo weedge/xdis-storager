@@ -4,48 +4,95 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/weedge/pkg/utils"
 )
 
-func (db *DB) checkKeyIndex(buf []byte) (int, error) {
-	if len(buf) < len(db.indexSlotVarBuf) {
+type DBKey struct {
+	DbIndex  int
+	Slot     uint64
+	Tag      []byte
+	DataType byte
+	RawKey   []byte
+}
+
+func (db *DB) encodeDBKey(dbKey *DBKey) (ek []byte) {
+	return
+}
+
+func (db *DB) decodeDBKey(ek []byte) (dbKey *DBKey) {
+
+	return
+}
+
+// GenDbIndexSlotHashEncodeByKey encode key by slot,hash of the key
+func (db *DB) GenDbIndexSlotHashEncodeByKey(key []byte) []byte {
+	if db.store.opts.Slots <= 0 {
+		return db.indexVarBuf
+	}
+	tag, slot := db.slot.HashKeyToSlot(key)
+	// the most size for varint is 10 bytes
+	slotBuf := make([]byte, MaxVarintLen64)
+	n := binary.PutUvarint(slotBuf, uint64(slot))
+	if len(tag) == 0 {
+		return utils.ConcatBytes([][]byte{db.indexVarBuf, slotBuf[0:n]})
+	}
+
+	// need use varint-encoded to compress key, if tagLen is big
+	tagLenBuf := make([]byte, 2)
+	binary.BigEndian.PutUint16(tagLenBuf, uint16(len(tag)))
+	return utils.ConcatBytes([][]byte{db.indexVarBuf, slotBuf[0:n], tagLenBuf, tag})
+}
+
+func (db *DB) checkDbIndexSlotHashEncodeKey(ek []byte) (pos int, err error) {
+	if pos, err = db.checkKeyIndex(ek); err != nil {
+		return
+	}
+	if db.store.opts.Slots <= 0 {
+		return
+	}
+
+	slot, n := binary.Uvarint(ek[pos:])
+	if n == 0 {
+		return 0, fmt.Errorf("buf too small")
+	}
+	if n < 0 {
+		return 0, fmt.Errorf("value larger than 64 bits (overflow)")
+	}
+	if slot < 0 {
+		return 0, fmt.Errorf("invalid slot")
+	}
+	pos += n
+
+	tagLen := int(binary.BigEndian.Uint16(ek[pos:]))
+	pos += 2
+	if tagLen == 0 {
+		return
+	}
+
+	_ = ek[pos : pos+tagLen]
+	pos += tagLen
+
+	return
+}
+
+func (db *DB) checkKeyIndex(ek []byte) (int, error) {
+	if len(ek) < len(db.indexVarBuf) {
 		return 0, fmt.Errorf("key is too small")
 	}
-	if !bytes.Equal(db.indexSlotVarBuf, buf[0:len(db.indexSlotVarBuf)]) {
+	if !bytes.Equal(db.indexVarBuf, ek[0:len(db.indexVarBuf)]) {
 		return 0, fmt.Errorf("invalid db index")
 	}
 
-	return len(db.indexSlotVarBuf), nil
-}
-
-// --- bitmap ---
-func (db *DB) encodeBitmapKey(key []byte) []byte {
-	ek := make([]byte, len(key)+1+len(db.indexSlotVarBuf))
-	pos := copy(ek, db.indexSlotVarBuf)
-	ek[pos] = BitmapType
-	pos++
-	copy(ek[pos:], key)
-	return ek
-}
-
-func (db *DB) decodeBitmapKey(ek []byte) ([]byte, error) {
-	pos, err := db.checkKeyIndex(ek)
-	if err != nil {
-		return nil, err
-	}
-	if pos+1 > len(ek) || ek[pos] != BitmapType {
-		return nil, ErrBitmapKey
-	}
-
-	pos++
-
-	return ek[pos:], nil
+	return len(db.indexVarBuf), nil
 }
 
 // --- string ---
 
 func (db *DB) encodeStringKey(key []byte) []byte {
-	ek := make([]byte, len(key)+1+len(db.indexSlotVarBuf))
-	pos := copy(ek, db.indexSlotVarBuf)
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	ek := make([]byte, len(key)+1+len(gBuf))
+	pos := copy(ek, gBuf)
 	ek[pos] = StringType
 	pos++
 	copy(ek[pos:], key)
@@ -53,7 +100,7 @@ func (db *DB) encodeStringKey(key []byte) []byte {
 }
 
 func (db *DB) decodeStringKey(ek []byte) ([]byte, error) {
-	pos, err := db.checkKeyIndex(ek)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return nil, err
 	}
@@ -69,8 +116,9 @@ func (db *DB) decodeStringKey(ek []byte) ([]byte, error) {
 // --- list ---
 
 func (db *DB) lEncodeMetaKey(key []byte) []byte {
-	buf := make([]byte, len(key)+1+len(db.indexSlotVarBuf))
-	pos := copy(buf, db.indexSlotVarBuf)
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+1+len(gBuf))
+	pos := copy(buf, gBuf)
 	buf[pos] = LMetaType
 	pos++
 
@@ -79,7 +127,7 @@ func (db *DB) lEncodeMetaKey(key []byte) []byte {
 }
 
 func (db *DB) lDecodeMetaKey(ek []byte) ([]byte, error) {
-	pos, err := db.checkKeyIndex(ek)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return nil, err
 	}
@@ -93,9 +141,10 @@ func (db *DB) lDecodeMetaKey(ek []byte) ([]byte, error) {
 }
 
 func (db *DB) lEncodeListKey(key []byte, seq int32) []byte {
-	buf := make([]byte, len(key)+7+len(db.indexSlotVarBuf))
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+7+len(gBuf))
 
-	pos := copy(buf, db.indexSlotVarBuf)
+	pos := copy(buf, gBuf)
 
 	buf[pos] = ListType
 	pos++
@@ -113,7 +162,7 @@ func (db *DB) lEncodeListKey(key []byte, seq int32) []byte {
 
 func (db *DB) lDecodeListKey(ek []byte) (key []byte, seq int32, err error) {
 	pos := 0
-	pos, err = db.checkKeyIndex(ek)
+	pos, err = db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return
 	}
@@ -145,10 +194,11 @@ func (db *DB) lDecodeListKey(ek []byte) (key []byte, seq int32, err error) {
 // --- hash ---
 
 func (db *DB) hEncodeSizeKey(key []byte) []byte {
-	buf := make([]byte, len(key)+1+len(db.indexSlotVarBuf))
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+1+len(gBuf))
 
 	pos := 0
-	n := copy(buf, db.indexSlotVarBuf)
+	n := copy(buf, gBuf)
 
 	pos += n
 	buf[pos] = HSizeType
@@ -160,7 +210,7 @@ func (db *DB) hEncodeSizeKey(key []byte) []byte {
 }
 
 func (db *DB) hDecodeSizeKey(ek []byte) ([]byte, error) {
-	pos, err := db.checkKeyIndex(ek)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return nil, err
 	}
@@ -174,10 +224,11 @@ func (db *DB) hDecodeSizeKey(ek []byte) ([]byte, error) {
 }
 
 func (db *DB) hEncodeHashKey(key []byte, field []byte) []byte {
-	buf := make([]byte, len(key)+len(field)+1+1+2+len(db.indexSlotVarBuf))
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+len(field)+1+1+2+len(gBuf))
 
 	pos := 0
-	n := copy(buf, db.indexSlotVarBuf)
+	n := copy(buf, gBuf)
 	pos += n
 
 	buf[pos] = HashType
@@ -197,7 +248,7 @@ func (db *DB) hEncodeHashKey(key []byte, field []byte) []byte {
 }
 
 func (db *DB) hDecodeHashKey(ek []byte) ([]byte, []byte, error) {
-	pos, err := db.checkKeyIndex(ek)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -244,9 +295,10 @@ func (db *DB) hEncodeStopKey(key []byte) []byte {
 
 // --- set ---
 func (db *DB) sEncodeSizeKey(key []byte) []byte {
-	buf := make([]byte, len(key)+1+len(db.indexSlotVarBuf))
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+1+len(gBuf))
 
-	pos := copy(buf, db.indexSlotVarBuf)
+	pos := copy(buf, gBuf)
 	buf[pos] = SSizeType
 
 	pos++
@@ -256,7 +308,7 @@ func (db *DB) sEncodeSizeKey(key []byte) []byte {
 }
 
 func (db *DB) sDecodeSizeKey(ek []byte) ([]byte, error) {
-	pos, err := db.checkKeyIndex(ek)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return nil, err
 	}
@@ -270,9 +322,10 @@ func (db *DB) sDecodeSizeKey(ek []byte) ([]byte, error) {
 }
 
 func (db *DB) sEncodeSetKey(key []byte, member []byte) []byte {
-	buf := make([]byte, len(key)+len(member)+1+1+2+len(db.indexSlotVarBuf))
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+len(member)+1+1+2+len(gBuf))
 
-	pos := copy(buf, db.indexSlotVarBuf)
+	pos := copy(buf, gBuf)
 
 	buf[pos] = SetType
 	pos++
@@ -291,7 +344,7 @@ func (db *DB) sEncodeSetKey(key []byte, member []byte) []byte {
 }
 
 func (db *DB) sDecodeSetKey(ek []byte) ([]byte, []byte, error) {
-	pos, err := db.checkKeyIndex(ek)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -340,8 +393,9 @@ func (db *DB) sEncodeStopKey(key []byte) []byte {
 // --- zset ---
 
 func (db *DB) zEncodeSizeKey(key []byte) []byte {
-	buf := make([]byte, len(key)+1+len(db.indexSlotVarBuf))
-	pos := copy(buf, db.indexSlotVarBuf)
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+1+len(gBuf))
+	pos := copy(buf, gBuf)
 	buf[pos] = ZSizeType
 	pos++
 	copy(buf[pos:], key)
@@ -349,7 +403,7 @@ func (db *DB) zEncodeSizeKey(key []byte) []byte {
 }
 
 func (db *DB) zDecodeSizeKey(ek []byte) ([]byte, error) {
-	pos, err := db.checkKeyIndex(ek)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return nil, err
 	}
@@ -362,9 +416,10 @@ func (db *DB) zDecodeSizeKey(ek []byte) ([]byte, error) {
 }
 
 func (db *DB) zEncodeSetKey(key []byte, member []byte) []byte {
-	buf := make([]byte, len(key)+len(member)+4+len(db.indexSlotVarBuf))
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+len(member)+4+len(gBuf))
 
-	pos := copy(buf, db.indexSlotVarBuf)
+	pos := copy(buf, gBuf)
 
 	buf[pos] = ZSetType
 	pos++
@@ -384,7 +439,7 @@ func (db *DB) zEncodeSetKey(key []byte, member []byte) []byte {
 }
 
 func (db *DB) zDecodeSetKey(ek []byte) ([]byte, []byte, error) {
-	pos, err := db.checkKeyIndex(ek)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -423,14 +478,15 @@ func (db *DB) zEncodeStartSetKey(key []byte) []byte {
 
 func (db *DB) zEncodeStopSetKey(key []byte) []byte {
 	k := db.zEncodeSetKey(key, nil)
-	k[len(k)-1] = zsetStartMemSep + 1
+	k[len(k)-1] = zsetStopMemSep
 	return k
 }
 
 func (db *DB) zEncodeScoreKey(key []byte, member []byte, score int64) []byte {
-	buf := make([]byte, len(key)+len(member)+13+len(db.indexSlotVarBuf))
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+len(member)+13+len(gBuf))
 
-	pos := copy(buf, db.indexSlotVarBuf)
+	pos := copy(buf, gBuf)
 
 	buf[pos] = ZScoreType
 	pos++
@@ -470,7 +526,7 @@ func (db *DB) zEncodeStopScoreKey(key []byte, score int64) []byte {
 
 func (db *DB) zDecodeScoreKey(ek []byte) (key []byte, member []byte, score int64, err error) {
 	pos := 0
-	pos, err = db.checkKeyIndex(ek)
+	pos, err = db.checkDbIndexSlotHashEncodeKey(ek)
 	if err != nil {
 		return
 	}
@@ -552,8 +608,6 @@ func (db *DB) encodeScanKey(storeDataType byte, key []byte) ([]byte, error) {
 		return db.zEncodeSizeKey(key), nil
 	case SSizeType:
 		return db.sEncodeSizeKey(key), nil
-	case BitmapType:
-		return db.encodeBitmapKey(key), nil
 	default:
 		return nil, ErrDataType
 	}
@@ -571,8 +625,6 @@ func (db *DB) decodeScanKey(storeDataType byte, ek []byte) (key []byte, err erro
 		key, err = db.zDecodeSizeKey(ek)
 	case SSizeType:
 		key, err = db.sDecodeSizeKey(ek)
-	case BitmapType:
-		key, err = db.decodeBitmapKey(ek)
 	default:
 		err = ErrDataType
 	}
@@ -582,9 +634,10 @@ func (db *DB) decodeScanKey(storeDataType byte, ek []byte) (key []byte, err erro
 // --- expire ttl ---
 
 func (db *DB) expEncodeMetaKey(dataType byte, key []byte) []byte {
-	buf := make([]byte, len(key)+2+len(db.indexSlotVarBuf))
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+2+len(gBuf))
 
-	pos := copy(buf, db.indexSlotVarBuf)
+	pos := copy(buf, gBuf)
 	buf[pos] = ExpMetaType
 	pos++
 	buf[pos] = dataType
@@ -596,7 +649,7 @@ func (db *DB) expEncodeMetaKey(dataType byte, key []byte) []byte {
 }
 
 func (db *DB) expDecodeMetaKey(mk []byte) (byte, []byte, error) {
-	pos, err := db.checkKeyIndex(mk)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(mk)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -609,9 +662,10 @@ func (db *DB) expDecodeMetaKey(mk []byte) (byte, []byte, error) {
 }
 
 func (db *DB) expEncodeTimeKey(dataType byte, key []byte, when int64) []byte {
-	buf := make([]byte, len(key)+10+len(db.indexSlotVarBuf))
+	gBuf := db.GenDbIndexSlotHashEncodeByKey(key)
+	buf := make([]byte, len(key)+10+len(gBuf))
 
-	pos := copy(buf, db.indexSlotVarBuf)
+	pos := copy(buf, gBuf)
 
 	buf[pos] = ExpTimeType
 	pos++
@@ -628,7 +682,7 @@ func (db *DB) expEncodeTimeKey(dataType byte, key []byte, when int64) []byte {
 }
 
 func (db *DB) expDecodeTimeKey(tk []byte) (byte, []byte, int64, error) {
-	pos, err := db.checkKeyIndex(tk)
+	pos, err := db.checkDbIndexSlotHashEncodeKey(tk)
 	if err != nil {
 		return 0, nil, 0, err
 	}
