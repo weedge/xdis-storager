@@ -49,6 +49,7 @@ func (db *DBSet) delete(t *Batch, key []byte) (num int64, err error) {
 
 	return num, nil
 }
+
 func (db *DBSet) sIncrSize(ctx context.Context, key []byte, delta int64) (int64, error) {
 	t := db.batch
 	sk := db.sEncodeSizeKey(key)

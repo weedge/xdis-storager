@@ -19,11 +19,31 @@ func binaryUvarint(buf []byte) (uint64, int, error) {
 	return data, n, nil
 }
 
-// | Version | CodeType | uvarint DBIndex |
-func (db *DB) encodeDbIndex(codeType byte) []byte {
-	return utils.ConcatBytes([][]byte{{Version, codeType}, db.indexVarBuf})
+// | uvarint DBIndex |
+func encodeIndex(index int) []byte {
+	buf := make([]byte, MaxVarintLen64)
+	n := binary.PutUvarint(buf, uint64(index))
+	return buf[:n]
 }
 
+// | Version | CodeType | uvarint DBIndex |
+func encodeDbIndexKey(index int, codeType byte) []byte {
+	return utils.ConcatBytes([][]byte{{Version, codeType}, encodeIndex(index)})
+}
+
+// | Version | CodeType | uvarint DBIndex (last byte + 1) |
+func encodeDbIndexEndKey(index int, codeType byte) []byte {
+	ek := utils.ConcatBytes([][]byte{{Version, codeType}, encodeIndex(index)})
+	ek[len(ek)-1] += 1
+	return ek
+}
+
+// | Version | CodeType | uvarint DBIndex |
+func (db *DB) encodeDbIndex(codeType byte) []byte {
+	return encodeDbIndexKey(db.index, codeType)
+}
+
+// | Version | CodeTypeMeta | uvarint DBIndex |
 // | Version | CodeTypeMeta | uvarint DBIndex | uvarint Slot |
 func (db *DB) encodeDbIndexSlot(slot uint64) []byte {
 	if db.store.opts.Slots <= 0 {
@@ -36,10 +56,11 @@ func (db *DB) encodeDbIndexSlot(slot uint64) []byte {
 }
 
 // encodeDbIndexSlotTagByKey encode key by slot,hash of the key
-// | Version | CodeTypeMeta | uvarint DBIndex | uvarint Slot | tagLen | Tag |
+// | Version | CodeTypeMeta | uvarint DBIndex | Key |
+// | Version | CodeTypeMeta | uvarint DBIndex | uvarint Slot | tagLen | Tag | Key |
 func (db *DB) encodeDbIndexSlotTagKey(key []byte) []byte {
 	if db.store.opts.Slots <= 0 {
-		return utils.ConcatBytes([][]byte{{Version, CodeTypeMeta}, db.indexVarBuf})
+		return utils.ConcatBytes([][]byte{{Version, CodeTypeMeta}, db.indexVarBuf, key})
 	}
 
 	tag, slot := db.slot.HashKeyToSlot(key)
@@ -55,12 +76,45 @@ func (db *DB) encodeDbIndexSlotTagKey(key []byte) []byte {
 	return utils.ConcatBytes([][]byte{db.indexVarBuf, slotBuf[0:n], tagLenBuf, tag, key})
 }
 
-func (db *DB) decodeDbIndexSlotTagKey(ek []byte) (key []byte) {
-	pos, err := db.checkDbIndexSlotTagEncodeKey(ek)
+func decodeDbIndexSlotTagMetaKey(index int, ek []byte) (key []byte, err error) {
+	pos, err := checkDbIndexSlotTagEncodeKey(index, ek)
 	if err != nil {
 		return
 	}
 	key = ek[pos:]
+
+	return
+}
+
+func (db *DB) decodeDbIndexSlotTagMetaKey(ek []byte) (key []byte, err error) {
+	return decodeDbIndexSlotTagMetaKey(db.index, ek)
+}
+
+func checkDbIndexSlotTagEncodeKey(index int, ek []byte) (pos int, err error) {
+	if pos, err = checkDbIndex(index, ek); err != nil {
+		return
+	}
+	if gOpts.Slots <= 0 {
+		return
+	}
+
+	_, n, err := binaryUvarint(ek[pos:])
+	if err != nil {
+		return 0, err
+	}
+	pos += n
+	if pos == len(ek) {
+		return
+	}
+	if pos > len(ek) {
+		return 0, fmt.Errorf("overflow pos:%d > len(ek):%d", pos, len(ek))
+	}
+	tagLen := int(binary.BigEndian.Uint16(ek[pos:]))
+	pos += 2
+	if tagLen == 0 {
+		return
+	}
+	pos += tagLen
 
 	return
 }
@@ -94,15 +148,20 @@ func (db *DB) checkDbIndexSlotTagEncodeKey(ek []byte) (pos int, err error) {
 	return
 }
 
-func (db *DB) checkDbIndex(ek []byte) (int, error) {
-	if len(ek) < len(db.indexVarBuf)+2 {
+func checkDbIndex(index int, ek []byte) (int, error) {
+	indexVarBuf := encodeIndex(index)
+	if len(ek) < len(indexVarBuf)+2 {
 		return 0, fmt.Errorf("key is too small")
 	}
-	if !bytes.Equal(db.indexVarBuf, ek[2:len(db.indexVarBuf)]) {
+	if !bytes.Equal(indexVarBuf, ek[2:2+len(indexVarBuf)]) {
 		return 0, fmt.Errorf("invalid db index")
 	}
 
-	return len(db.indexVarBuf), nil
+	return 2 + len(indexVarBuf), nil
+}
+
+func (db *DB) checkDbIndex(ek []byte) (int, error) {
+	return checkDbIndex(db.index, ek)
 }
 
 // --- string ---
@@ -672,8 +731,8 @@ func (db *DB) decodeScanKey(storeDataType byte, ek []byte) (key []byte, err erro
 
 // val : when(expiredAt)
 // | Version | CodeTypeData | uvarint DBIndex | ExpMetaType | dataType | Key |
-func (db *DB) expEncodeMetaKey(dataType byte, key []byte) []byte {
-	gBuf := db.encodeDbIndex(CodeTypeData)
+func encodeExpMetaKey(index int, dataType byte, key []byte) []byte {
+	gBuf := encodeDbIndexKey(index, CodeTypeData)
 	buf := make([]byte, len(key)+2+len(gBuf))
 
 	pos := copy(buf, gBuf)
@@ -687,8 +746,12 @@ func (db *DB) expEncodeMetaKey(dataType byte, key []byte) []byte {
 	return buf
 }
 
-func (db *DB) expDecodeMetaKey(mk []byte) (byte, []byte, error) {
-	pos, err := db.checkDbIndex(mk)
+func (db *DB) expEncodeMetaKey(dataType byte, key []byte) []byte {
+	return encodeExpMetaKey(db.index, dataType, key)
+}
+
+func decodeExpMetaKey(index int, mk []byte) (byte, []byte, error) {
+	pos, err := checkDbIndex(index, mk)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -700,10 +763,14 @@ func (db *DB) expDecodeMetaKey(mk []byte) (byte, []byte, error) {
 	return mk[pos+1], mk[pos+2:], nil
 }
 
+func (db *DB) expDecodeMetaKey(mk []byte) (byte, []byte, error) {
+	return decodeExpMetaKey(db.index, mk)
+}
+
 // for check ttl range to del expired key
 // | Version | CodeTypeData | uvarint DBIndex | ExpTimeType | when | dataType | Key |
-func (db *DB) expEncodeTimeKey(dataType byte, key []byte, when int64) []byte {
-	gBuf := db.encodeDbIndex(CodeTypeData)
+func encodeExpTimeKey(index int, dataType byte, key []byte, when int64) []byte {
+	gBuf := encodeDbIndexKey(index, CodeTypeData)
 	buf := make([]byte, len(key)+10+len(gBuf))
 
 	pos := copy(buf, gBuf)
@@ -722,8 +789,12 @@ func (db *DB) expEncodeTimeKey(dataType byte, key []byte, when int64) []byte {
 	return buf
 }
 
-func (db *DB) expDecodeTimeKey(tk []byte) (byte, []byte, int64, error) {
-	pos, err := db.checkDbIndex(tk)
+func (db *DB) expEncodeTimeKey(dataType byte, key []byte, when int64) []byte {
+	return encodeExpTimeKey(db.index, dataType, key, when)
+}
+
+func decodeExpTimeKey(index int, tk []byte) (byte, []byte, int64, error) {
+	pos, err := checkDbIndex(index, tk)
 	if err != nil {
 		return 0, nil, 0, err
 	}
@@ -733,6 +804,10 @@ func (db *DB) expDecodeTimeKey(tk []byte) (byte, []byte, int64, error) {
 	}
 
 	return tk[pos+9], tk[pos+10:], int64(binary.BigEndian.Uint64(tk[pos+1:])), nil
+}
+
+func (db *DB) expDecodeTimeKey(tk []byte) (byte, []byte, int64, error) {
+	return decodeExpTimeKey(db.index, tk)
 }
 
 //--- ext binary number ---

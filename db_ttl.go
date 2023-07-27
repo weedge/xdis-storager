@@ -19,6 +19,9 @@ func (db *DB) rmExpire(t *Batch, dataType byte, key []byte) (int64, error) {
 	tk := db.expEncodeTimeKey(dataType, key, when)
 	t.Delete(mk)
 	t.Delete(tk)
+
+	RemoveDBExpKeyStats(db.store, db.stats, mk, tk, when)
+
 	return 1, nil
 }
 
@@ -44,6 +47,8 @@ func (db *DB) expireAt(t *Batch, dataType byte, key []byte, when int64) {
 
 	t.Put(tk, mk)
 	t.Put(mk, PutInt64(when))
+
+	AddDBExpKeyStats(db.store, db.stats, mk, tk, when)
 
 	db.ttlChecker.setNextCheckTime(when, false)
 }

@@ -8,10 +8,13 @@ require (
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
 	github.com/stretchr/testify v1.8.3
 	github.com/syndtr/goleveldb v1.0.0
-	github.com/weedge/pkg v0.0.0-20230725030031-e699e06784f3
+	github.com/twmb/murmur3 v1.1.8
+	github.com/tylertreat/BoomFilters v0.0.0-20210315201527-1a82519a3e43
+	github.com/weedge/pkg v0.0.0-20230727152516-69a060bfa303
 )
 
 require (
+	github.com/d4l3k/messagediff v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect

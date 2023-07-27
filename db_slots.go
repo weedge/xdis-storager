@@ -10,16 +10,6 @@ import (
 	"github.com/weedge/pkg/driver"
 )
 
-func (m *DB) SetKeyMeta(t *Batch, key []byte, dataType byte) {
-	ek := m.encodeDbIndexSlotTagKey(key)
-	t.Put(ek, []byte{dataType})
-}
-
-func (m *DB) DelKeyMeta(t *Batch, key []byte, dataType byte) {
-	ek := m.encodeDbIndexSlotTagKey(key)
-	t.Delete(ek)
-}
-
 // HashTag like redis cluster hash tag
 func HashTag(key []byte) []byte {
 	part := key
@@ -99,7 +89,7 @@ func (m *DBSlot) MigrateKeyWithSameTag(ctx context.Context, addr string, timeout
 	return
 }
 
-// SlotsRestore dest migrate addr restore slot obj [key ttlms value ...]
+// SlotsRestore dest migrate addr restore slot obj [key ttlms serialized-value(rdb) ...]
 func (m *DBSlot) SlotsRestore(ctx context.Context, objs ...*driver.SlotsRestoreObj) (err error) {
 	return
 }

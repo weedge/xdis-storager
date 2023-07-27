@@ -1,8 +1,6 @@
 package storager
 
 import (
-	"encoding/binary"
-
 	"github.com/weedge/pkg/driver"
 	"github.com/weedge/pkg/utils"
 	kvDriver "github.com/weedge/xdis-storager/driver"
@@ -27,6 +25,9 @@ type DB struct {
 	bitmap *DBBitmap
 
 	slot *DBSlot
+
+	// db stats keys, expire keys, avg ttl etc..
+	stats *DBStats
 
 	ttlChecker *TTLChecker
 }
@@ -93,8 +94,17 @@ func (db *DB) IndexVarBuf() []byte {
 // SetIndex set the index of database.
 func (db *DB) SetIndex(index int) {
 	db.index = index
-	buf := make([]byte, MaxVarintLen64)
-	n := binary.PutUvarint(buf, uint64(index))
+	db.indexVarBuf = encodeIndex(index)
+}
 
-	db.indexVarBuf = buf[0:n]
+func (m *DB) SetKeyMeta(t *Batch, key []byte, dataType byte) {
+	ek := m.encodeDbIndexSlotTagKey(key)
+	t.Put(ek, []byte{dataType})
+	AddDBKeyCn(m.store, m.stats, key)
+}
+
+func (m *DB) DelKeyMeta(t *Batch, key []byte, dataType byte) {
+	ek := m.encodeDbIndexSlotTagKey(key)
+	t.Delete(ek)
+	RemoveDBKeyCn(m.store, m.stats, key)
 }

@@ -11,12 +11,16 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/gofrs/flock"
+	"github.com/twmb/murmur3"
+	boom "github.com/tylertreat/BoomFilters"
 	"github.com/weedge/pkg/driver"
 	"github.com/weedge/pkg/safer"
 	"github.com/weedge/xdis-storager/config"
 	storagerDriver "github.com/weedge/xdis-storager/driver"
 	"github.com/weedge/xdis-storager/openkv"
 )
+
+var gOpts *config.StorgerOptions
 
 // Storager core store struct for server use like redis
 type Storager struct {
@@ -40,6 +44,11 @@ type Storager struct {
 
 	// when set committer, use committer.Commit instead of writebatch commit for write op
 	committer storagerDriver.ICommitter
+
+	// counting bloom filter for db stats
+	cbf *boom.CountingBloomFilter
+	// need lock to op CBF bitset
+	cbfLock sync.Mutex
 
 	// ttl check
 	ttlCheckers  []*TTLChecker
@@ -80,6 +89,10 @@ func (store *Storager) Open(ctx context.Context) (err error) {
 		return
 	}
 
+	store.cbf = boom.NewCountingBloomFilter(opts.CBFItmeCn, opts.CBFBucketSize, opts.CBFFpRate)
+	store.cbf.SetHash(murmur3.New64())
+	InitAllDbStats(store)
+
 	store.dbs = make(map[int]*DB, opts.Databases)
 	store.quit = make(chan struct{})
 
@@ -111,6 +124,7 @@ func (m *Storager) InitOpts(opts *config.StorgerOptions) {
 	}
 
 	m.opts = opts
+	gOpts = opts
 }
 
 // Close close ttl check, kv store close, flock close
@@ -158,6 +172,7 @@ func (m *Storager) Select(ctx context.Context, index int) (idb driver.IDB, err e
 	}
 	db = NewDB(m, index)
 	m.dbs[index] = db
+	db.stats = LoadDbStats(index)
 
 	// async send checker,
 	// if recv checkTTL tick to check,ch full, maybe block

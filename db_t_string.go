@@ -26,8 +26,8 @@ func NewDBString(db *DB) *DBString {
 }
 
 func (db *DBString) delete(t *Batch, key []byte) (int64, error) {
-	key = db.encodeStringKey(key)
-	t.Delete(key)
+	ek := db.encodeStringKey(key)
+	t.Delete(ek)
 	db.DelKeyMeta(t, key, StringType)
 	return 1, nil
 }
@@ -371,7 +371,7 @@ func (db *DBString) Del(ctx context.Context, keys ...[]byte) (int64, error) {
 		if err == nil && v != nil {
 			nums++
 		}
-		t.Delete(codedKeys[i])
+		db.delete(t, k)
 		db.rmExpire(t, StringType, k)
 	}
 
