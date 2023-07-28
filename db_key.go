@@ -56,11 +56,11 @@ func (db *DB) encodeDbIndexSlot(slot uint64) []byte {
 }
 
 // encodeDbIndexSlotTagByKey encode key by slot,hash of the key
-// | Version | CodeTypeMeta | uvarint DBIndex | Key |
-// | Version | CodeTypeMeta | uvarint DBIndex | uvarint Slot | tagLen | Tag | Key |
-func (db *DB) encodeDbIndexSlotTagKey(key []byte) []byte {
+// | Version | CodeTypeMeta | uvarint DBIndex | dataType | Key |
+// | Version | CodeTypeMeta | uvarint DBIndex | uvarint Slot | tagLen | Tag | dataType | Key |
+func (db *DB) encodeDbIndexSlotTagKey(key []byte, dataType byte) []byte {
 	if db.store.opts.Slots <= 0 {
-		return utils.ConcatBytes([][]byte{{Version, CodeTypeMeta}, db.indexVarBuf, key})
+		return utils.ConcatBytes([][]byte{{Version, CodeTypeMeta}, db.indexVarBuf, {dataType}, key})
 	}
 
 	tag, slot := db.slot.HashKeyToSlot(key)
@@ -73,7 +73,7 @@ func (db *DB) encodeDbIndexSlotTagKey(key []byte) []byte {
 	// need use varint-encoded to compress key, if tagLen is big
 	tagLenBuf := make([]byte, 2)
 	binary.BigEndian.PutUint16(tagLenBuf, uint16(len(tag)))
-	return utils.ConcatBytes([][]byte{db.indexVarBuf, slotBuf[0:n], tagLenBuf, tag, key})
+	return utils.ConcatBytes([][]byte{db.indexVarBuf, slotBuf[0:n], tagLenBuf, tag, {dataType}, key})
 }
 
 func decodeDbIndexSlotTagMetaKey(index int, ek []byte) (key []byte, err error) {
@@ -115,6 +115,9 @@ func checkDbIndexSlotTagEncodeKey(index int, ek []byte) (pos int, err error) {
 		return
 	}
 	pos += tagLen
+
+	// dataType
+	pos++
 
 	return
 }

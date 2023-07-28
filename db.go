@@ -98,13 +98,13 @@ func (db *DB) SetIndex(index int) {
 }
 
 func (m *DB) SetKeyMeta(t *Batch, key []byte, dataType byte) {
-	ek := m.encodeDbIndexSlotTagKey(key)
-	t.Put(ek, []byte{dataType})
-	AddDBKeyCn(m.store, m.stats, key)
+	ek := m.encodeDbIndexSlotTagKey(key, dataType)
+	t.Put(ek, []byte{})
+	AddDBKeyCn(m.store, m.stats, ek)
 }
 
 func (m *DB) DelKeyMeta(t *Batch, key []byte, dataType byte) {
-	ek := m.encodeDbIndexSlotTagKey(key)
+	ek := m.encodeDbIndexSlotTagKey(key, dataType)
 	t.Delete(ek)
-	RemoveDBKeyCn(m.store, m.stats, key)
+	RemoveDBKeyCn(m.store, m.stats, ek)
 }

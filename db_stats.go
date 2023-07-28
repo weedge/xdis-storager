@@ -106,11 +106,7 @@ func GetDbStats(s *Storager, index int) *DBStats {
 	it := s.odb.RangeIterator(ek, sk, driver.RangeOpen)
 	for ; it.Valid(); it.Next() {
 		ek := it.RawKey()
-		key, err := decodeDbIndexSlotTagMetaKey(index, ek)
-		if err != nil {
-			continue
-		}
-		AddDBKeyCn(s, stats, key)
+		AddDBKeyCn(s, stats, ek)
 	}
 	it.Close()
 

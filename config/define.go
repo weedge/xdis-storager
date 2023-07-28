@@ -28,5 +28,5 @@ const (
 	// false-positive rate
 	DefaultCBFfpRate = 0.01
 
-	// Count-min Sketch There are some false-positive that maybe do not fit this case
+	// Count-min Sketch There are more false-positive that maybe do not fit this case
 )
