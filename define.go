@@ -161,6 +161,7 @@ var (
 
 	// For slots
 	ErrUnsupportSlots = errors.New("unsupport slots")
+	ErrKeyNotFound    = errors.New("key not found")
 )
 
 // For list op

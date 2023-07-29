@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/weedge/pkg/driver"
+	"github.com/weedge/pkg/rdb"
 	"github.com/weedge/xdis-storager/openkv"
 )
 
@@ -681,4 +682,34 @@ func (db *DBList) Exists(ctx context.Context, key []byte) (int64, error) {
 		return 1, nil
 	}
 	return 0, err
+}
+
+// Dump list rdb
+func (db *DBList) Dump(ctx context.Context, key []byte) (binVal []byte, err error) {
+	v, err := db.LRange(ctx, key, 0, -1)
+	if err != nil {
+		return
+	} else if len(v) == 0 {
+		return
+	}
+
+	return rdb.DumpListValue(v), nil
+}
+
+// Restore list rdb
+func (db *DBList) Restore(ctx context.Context, key []byte, ttl int64, val rdb.List) (err error) {
+	if _, err = db.Del(ctx, key); err != nil {
+		return
+	}
+
+	if _, err = db.RPush(ctx, key, val...); err != nil {
+		return
+	}
+
+	if ttl > 0 {
+		if _, err = db.Expire(ctx, key, ttl); err != nil {
+			return
+		}
+	}
+	return
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/weedge/pkg/driver"
+	"github.com/weedge/pkg/rdb"
 	"github.com/weedge/pkg/utils"
 	"github.com/weedge/xdis-storager/openkv"
 )
@@ -921,4 +922,46 @@ func (db *DBZSet) zExpireAt(ctx context.Context, key []byte, when int64) (int64,
 	}
 
 	return 1, nil
+}
+
+// Dump zset rdb
+func (db *DBZSet) Dump(ctx context.Context, key []byte) (binVal []byte, err error) {
+	v, err := db.ZRangeByScore(ctx, key, MinScore, MaxScore, 0, -1)
+	if err != nil {
+		return
+	} else if len(v) == 0 {
+		return
+	}
+
+	zsVal := make(rdb.ZSet, len(v))
+	for i := 0; i < len(v); i++ {
+		zsVal[i].Member = v[i].Member
+		zsVal[i].Score = float64(v[i].Score)
+	}
+
+	return rdb.DumpZSetValue(zsVal), nil
+}
+
+// Restore zset rdb
+// use int64 for zset score, not float
+func (db *DBZSet) Restore(ctx context.Context, key []byte, ttl int64, val rdb.ZSet) (err error) {
+	if _, err = db.Del(ctx, key); err != nil {
+		return
+	}
+
+	sp := make([]driver.ScorePair, len(val))
+	for i := 0; i < len(val); i++ {
+		sp[i] = driver.ScorePair{Score: int64(val[i].Score), Member: val[i].Member}
+	}
+
+	if _, err = db.ZAdd(ctx, key, sp...); err != nil {
+		return
+	}
+
+	if ttl > 0 {
+		if _, err = db.Expire(ctx, key, ttl); err != nil {
+			return
+		}
+	}
+	return
 }

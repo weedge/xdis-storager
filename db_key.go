@@ -55,6 +55,22 @@ func (db *DB) encodeDbIndexSlot(slot uint64) []byte {
 	return utils.ConcatBytes([][]byte{{Version, CodeTypeMeta}, db.indexVarBuf, slotBuf[0:n]})
 }
 
+// | Version | CodeTypeMeta | uvarint DBIndex |
+// | Version | CodeTypeMeta | uvarint DBIndex | uvarint Slot | tagLen | Tag |
+func (db *DB) encodeDbIndexSlotTag(tag []byte) []byte {
+	if db.store.opts.Slots <= 0 {
+		return utils.ConcatBytes([][]byte{{Version, CodeTypeMeta}, db.indexVarBuf})
+	}
+
+	slot := db.slot.HashTagToSlot(tag)
+	slotBuf := make([]byte, MaxVarintLen64)
+	n := binary.PutUvarint(slotBuf, uint64(slot))
+
+	tagLenBuf := make([]byte, 2)
+	binary.BigEndian.PutUint16(tagLenBuf, uint16(len(tag)))
+	return utils.ConcatBytes([][]byte{{Version, CodeTypeMeta}, db.indexVarBuf, slotBuf[0:n], tagLenBuf, tag})
+}
+
 // encodeDbIndexSlotTagByKey encode key by slot,hash of the key
 // | Version | CodeTypeMeta | uvarint DBIndex | dataType | Key |
 // | Version | CodeTypeMeta | uvarint DBIndex | uvarint Slot | tagLen | Tag | dataType | Key |
@@ -67,59 +83,80 @@ func (db *DB) encodeDbIndexSlotTagKey(key []byte, dataType byte) []byte {
 	slotBuf := make([]byte, MaxVarintLen64)
 	n := binary.PutUvarint(slotBuf, uint64(slot))
 
-	if bytes.Equal(tag, key) {
-		tag = []byte{}
-	}
 	// need use varint-encoded to compress key, if tagLen is big
 	tagLenBuf := make([]byte, 2)
 	binary.BigEndian.PutUint16(tagLenBuf, uint16(len(tag)))
 	return utils.ConcatBytes([][]byte{db.indexVarBuf, slotBuf[0:n], tagLenBuf, tag, {dataType}, key})
 }
 
-func decodeDbIndexSlotTagMetaKey(index int, ek []byte) (key []byte, err error) {
-	pos, err := checkDbIndexSlotTagEncodeKey(index, ek)
+type MetaObjKey struct {
+	Version  byte
+	CodeType byte
+	DBIndex  uint64
+	SlotId   uint64
+	Tag      []byte
+	DataType byte
+	DataKey  []byte
+}
+
+func decodeDbIndexSlotTagMetaKey(index int, ek []byte) (meta *MetaObjKey, err error) {
+	pos := 0
+	meta = new(MetaObjKey)
+	if len(ek) < 2 {
+		err = fmt.Errorf("key is too small")
+		return
+	}
+	meta.Version = ek[0]
+	meta.CodeType = ek[1]
+
+	// DB Index
+	pos += 2
+	data, n, err := binaryUvarint(ek[pos:])
 	if err != nil {
 		return
 	}
-	key = ek[pos:]
-
-	return
-}
-
-func (db *DB) decodeDbIndexSlotTagMetaKey(ek []byte) (key []byte, err error) {
-	return decodeDbIndexSlotTagMetaKey(db.index, ek)
-}
-
-func checkDbIndexSlotTagEncodeKey(index int, ek []byte) (pos int, err error) {
-	if pos, err = checkDbIndex(index, ek); err != nil {
-		return
-	}
+	meta.DBIndex = data
 	if gOpts.Slots <= 0 {
 		return
 	}
 
-	_, n, err := binaryUvarint(ek[pos:])
+	// SlotId
+	pos += n
+	data, n, err = binaryUvarint(ek[pos:])
 	if err != nil {
-		return 0, err
+		return
 	}
+	meta.SlotId = data
+
+	// Tag
 	pos += n
 	if pos == len(ek) {
 		return
 	}
 	if pos > len(ek) {
-		return 0, fmt.Errorf("overflow pos:%d > len(ek):%d", pos, len(ek))
+		err = fmt.Errorf("overflow pos:%d > len(ek):%d", pos, len(ek))
+		return
 	}
 	tagLen := int(binary.BigEndian.Uint16(ek[pos:]))
 	pos += 2
 	if tagLen == 0 {
 		return
 	}
-	pos += tagLen
+	meta.Tag = ek[pos : pos+tagLen]
 
 	// dataType
+	pos += tagLen
+	meta.DataType = ek[pos]
+
+	// Key
 	pos++
+	meta.DataKey = ek[pos:]
 
 	return
+}
+
+func (db *DB) decodeDbIndexSlotTagMetaKey(ek []byte) (meta *MetaObjKey, err error) {
+	return decodeDbIndexSlotTagMetaKey(db.index, ek)
 }
 
 func (db *DB) checkDbIndexSlotTagEncodeKey(ek []byte) (pos int, err error) {

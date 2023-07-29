@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/weedge/pkg/driver"
+	"github.com/weedge/pkg/rdb"
 	"github.com/weedge/pkg/utils"
 )
 
@@ -538,4 +539,34 @@ func (db *DBSet) Persist(ctx context.Context, key []byte) (int64, error) {
 	}
 	err = t.Commit(ctx)
 	return n, err
+}
+
+// Dump set rdb
+func (db *DBSet) Dump(ctx context.Context, key []byte) (binVal []byte, err error) {
+	v, err := db.SMembers(ctx, key)
+	if err != nil {
+		return
+	} else if len(v) == 0 {
+		return
+	}
+
+	return rdb.DumpSetValue(v), nil
+}
+
+// Restore set rdb
+func (db *DBSet) Restore(ctx context.Context, key []byte, ttl int64, val rdb.Set) (err error) {
+	if _, err = db.Del(ctx, key); err != nil {
+		return
+	}
+
+	if _, err = db.SAdd(ctx, key, val...); err != nil {
+		return
+	}
+
+	if ttl > 0 {
+		if _, err = db.Expire(ctx, key, ttl); err != nil {
+			return
+		}
+	}
+	return
 }

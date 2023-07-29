@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/weedge/pkg/driver"
+	"github.com/weedge/pkg/rdb"
 	"github.com/weedge/pkg/utils"
 )
 
@@ -462,4 +463,45 @@ func (db *DBHash) Clear(ctx context.Context, key []byte) (int64, error) {
 
 	err = t.Commit(ctx)
 	return num, err
+}
+
+// Dump hash rdb
+func (db *DBHash) Dump(ctx context.Context, key []byte) (binVal []byte, err error) {
+	v, err := db.HGetAll(ctx, key)
+	if err != nil {
+		return
+	} else if len(v) == 0 {
+		return
+	}
+
+	hv := make(rdb.Hash, len(v))
+	for i := 0; i < len(v); i++ {
+		hv[i].Field = v[i].Field
+		hv[i].Value = v[i].Value
+	}
+
+	return rdb.DumpHashValue(hv), nil
+}
+
+// Restore hash rdb
+func (db *DBHash) Restore(ctx context.Context, key []byte, ttl int64, val rdb.Hash) (err error) {
+	if _, err = db.Del(ctx, key); err != nil {
+		return
+	}
+
+	fv := make([]driver.FVPair, len(val))
+	for i := 0; i < len(val); i++ {
+		fv[i] = driver.FVPair{Field: val[i].Field, Value: val[i].Value}
+	}
+
+	if err = db.HMset(ctx, key, fv...); err != nil {
+		return
+	}
+
+	if ttl > 0 {
+		if _, err = db.Expire(ctx, key, ttl); err != nil {
+			return
+		}
+	}
+	return
 }

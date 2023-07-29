@@ -8,6 +8,7 @@ import (
 
 	"github.com/weedge/pkg/driver"
 	openkvDriver "github.com/weedge/pkg/driver/openkv"
+	"github.com/weedge/pkg/rdb"
 	"github.com/weedge/pkg/utils"
 )
 
@@ -605,4 +606,34 @@ func (db *DBString) Append(ctx context.Context, key []byte, value []byte) (int64
 	}
 
 	return int64(len(oldValue)), nil
+}
+
+// Dump string rdb
+func (db *DBString) Dump(ctx context.Context, key []byte) (binVal []byte, err error) {
+	v, err := db.Get(ctx, key)
+	if err != nil {
+		return
+	} else if v == nil {
+		return
+	}
+
+	return rdb.DumpStringValue(v), nil
+}
+
+// Restore string rdb
+func (db *DBString) Restore(ctx context.Context, key []byte, ttl int64, val rdb.String) (err error) {
+	if _, err = db.Del(ctx, key); err != nil {
+		return
+	}
+
+	if err = db.Set(ctx, key, val); err != nil {
+		return
+	}
+
+	if ttl > 0 {
+		if _, err = db.Expire(ctx, key, ttl); err != nil {
+			return
+		}
+	}
+	return
 }
