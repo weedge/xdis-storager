@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/redis/go-redis/v9"
 	"github.com/weedge/pkg/driver"
 	goredisinjectors "github.com/weedge/pkg/injectors/goredis-injectors"
@@ -79,7 +80,8 @@ func (m *DBSlot) MigrateSlotOneKey(ctx context.Context, addr string, timeout tim
 		return
 	}
 
-	return m.migrate(ctx, addr, timeout, key)
+	migrateCn, err = m.migrate(ctx, addr, timeout, key)
+	return
 }
 
 // MigrateSlotKeyWithSameTag migrate slot keys/vals  which have the same tag with one key to addr with timeout (ms)
@@ -98,7 +100,8 @@ func (m *DBSlot) MigrateSlotKeyWithSameTag(ctx context.Context, addr string, tim
 	if err != nil {
 		return
 	}
-	return m.migrate(ctx, addr, timeout, metaKeys...)
+	migrateCn, err = m.migrate(ctx, addr, timeout, metaKeys...)
+	return
 }
 
 // MigrateOneKey migrate one key/val (no hash tag  tag=key) to addr with timeout (ms)
@@ -113,7 +116,8 @@ func (m *DBSlot) MigrateOneKey(ctx context.Context, addr string, timeout time.Du
 	if err != nil {
 		return
 	}
-	return m.migrate(ctx, addr, timeout, metaKeys...)
+	migrateCn, err = m.migrate(ctx, addr, timeout, metaKeys...)
+	return
 }
 
 // MigrateKeyWithSameTag migrate keys/vals which have the same tag with one key to addr with timeout (ms)
@@ -128,7 +132,9 @@ func (m *DBSlot) MigrateKeyWithSameTag(ctx context.Context, addr string, timeout
 	if err != nil {
 		return
 	}
-	return m.migrate(ctx, addr, timeout, metaKeys...)
+
+	migrateCn, err = m.migrate(ctx, addr, timeout, metaKeys...)
+	return
 }
 
 // SlotsRestore dest migrate addr restore slot obj [key ttlms serialized-value(rdb) ...]
@@ -137,6 +143,7 @@ func (m *DBSlot) SlotsRestore(ctx context.Context, objs ...*driver.SlotsRestoreO
 		key := obj.Key
 		val, err := rdb.DecodeDump(obj.Val)
 		if err != nil {
+			klog.CtxDebugf(ctx, "binVal %b decode err:%s", obj.Val, err.Error())
 			return err
 		}
 
@@ -168,22 +175,33 @@ func (m *DBSlot) SlotsRestore(ctx context.Context, objs ...*driver.SlotsRestoreO
 
 // SlotsInfo show slot info with slots range [start,start+count]
 // return slotInfo slice
-// if slot have key, slotInfo.Size is 1, else is 0
-func (m *DBSlot) SlotsInfo(ctx context.Context, startSlot, count uint64) (slotInfos []*driver.SlotInfo, err error) {
-	slotInfos = make([]*driver.SlotInfo, count)
-	limit := startSlot + count
-	for slot := startSlot; slot < limit && slot < uint64(m.store.opts.Slots); slot++ {
+// if withSize is true, slotInfo.Size is slot's keys cn; size>0,show it;
+// else exits key is 1, show it
+func (m *DBSlot) SlotsInfo(ctx context.Context, startSlot, count uint64, withSize bool) (slotInfos []*driver.SlotInfo, err error) {
+	if m.store.opts.Slots <= 0 {
+		return nil, ErrUnsupportSlots
+	}
+
+	end := startSlot + count
+	for slot := startSlot; slot <= end && slot < uint64(m.store.opts.Slots); slot++ {
 		info := &driver.SlotInfo{}
-		if key, err := m.findSlotFirstMetaObjKey(ctx, slot); err != nil {
-			return nil, err
-		} else if key != nil {
-			info.Num = slot
-			info.Size = 1
+		if !withSize {
+			if key, err := m.findSlotFirstMetaObjKey(ctx, slot); err != nil && err != ErrKeyNotFound {
+				return nil, err
+			} else if key != nil {
+				info.Num = slot
+				info.Size = 1
+				slotInfos = append(slotInfos, info)
+			}
 		} else {
-			info.Num = slot
-			info.Size = 0
+			if size, err := m.getSlotMetaObjKeyCn(ctx, slot); err != nil {
+				return nil, err
+			} else if size > 0 {
+				info.Num = slot
+				info.Size = size
+				slotInfos = append(slotInfos, info)
+			}
 		}
-		slotInfos = append(slotInfos, info)
 	}
 
 	return
@@ -193,9 +211,12 @@ func (m *DBSlot) SlotsInfo(ctx context.Context, startSlot, count uint64) (slotIn
 // just del slot one key
 // if slot have key to del, slotInfo.Size is 1, else is 0
 func (m *DBSlot) SlotsDel(ctx context.Context, slots ...uint64) (slotInfos []*driver.SlotInfo, err error) {
+	if m.store.opts.Slots <= 0 {
+		return nil, ErrUnsupportSlots
+	}
 	for _, slot := range slots {
 		info := &driver.SlotInfo{}
-		if key, err := m.findSlotFirstMetaObjKey(ctx, slot); err != nil {
+		if key, err := m.findSlotFirstMetaObjKey(ctx, slot); err != nil && err != ErrKeyNotFound {
 			return nil, err
 		} else if key != nil {
 			if _, err = m.Del(ctx, key); err != nil {
@@ -218,42 +239,67 @@ func (m *DBSlot) SlotsDel(ctx context.Context, slots ...uint64) (slotInfos []*dr
 // - Keys in each db can be found in the corresponding slot
 // WARNING: just used debug/test, don't use in product,
 func (m *DBSlot) SlotsCheck(ctx context.Context) (err error) {
+	if m.store.opts.Slots <= 0 {
+		return ErrUnsupportSlots
+	}
 	return
 }
 
 func (m *DBSlot) findSlotFirstMetaObjKey(ctx context.Context, slot uint64) (meta *MetaObjKey, err error) {
 	slotEk := m.encodeDbIndexSlot(slot)
 	it := m.NewIterator()
+	defer it.Close()
 	if it.Seek(slotEk); it.Valid() {
 		ek := it.Key()
+		// prefix iter end
 		if !bytes.HasPrefix(ek, slotEk) {
-			return nil, fmt.Errorf("prefix %s not match in %s", slotEk, ek)
+			return nil, ErrKeyNotFound
 		}
 		meta, err = m.decodeDbIndexSlotTagMetaKey(ek)
 		return
 	}
-	it.Close()
 
 	return nil, ErrKeyNotFound
+}
+
+func (m *DBSlot) getSlotMetaObjKeyCn(ctx context.Context, slot uint64) (cn uint64, err error) {
+	slotEk := m.encodeDbIndexSlot(slot)
+	it := m.NewIterator()
+	defer it.Close()
+	for it.Seek(slotEk); it.Valid(); it.Next() {
+		ek := it.RawKey()
+		// prefix iter end
+		if !bytes.HasPrefix(ek, slotEk) {
+			break
+		}
+		cn++
+	}
+
+	return
 }
 
 func (m *DBSlot) findSlotAllTagMetaObjKey(ctx context.Context, tag []byte) (objs []*MetaObjKey, err error) {
 	tagEk := m.encodeDbIndexSlotTag(tag)
 	it := m.NewIterator()
+	defer it.Close()
 	for it.Seek(tagEk); it.Valid(); it.Next() {
 		ek := it.Key()
+		// prefix iter end
 		if !bytes.HasPrefix(ek, tagEk) {
-			return nil, fmt.Errorf("prefix %s not match in %s", tagEk, ek)
+			break
 		}
+
 		MetaObjKey, kerr := m.decodeDbIndexSlotTagMetaKey(ek)
 		if kerr != nil {
 			return nil, kerr
 		}
 		objs = append(objs, MetaObjKey)
 	}
-	it.Close()
 
-	return nil, ErrKeyNotFound
+	if len(objs) == 0 {
+		return nil, ErrKeyNotFound
+	}
+	return
 }
 
 // migrate key to addr with timeout(r/w), but migrate have some w ops,
@@ -272,13 +318,16 @@ func (m *DBSlot) findSlotAllTagMetaObjKey(ctx context.Context, tag []byte) (objs
 // To support migrate <-> redis
 // the dump value format is the same as redis.
 // https://github.com/sripathikrishnan/redis-rdb-tools/blob/master/docs/RDB_Version_History.textile
+// more think:
+// use lsm tree as kvstore engine, need do sm compaction sstables when so many migrated keys, so need dump sstables then load it
 func (m *DBSlot) migrate(ctx context.Context, addr string, timeout time.Duration, keys ...*MetaObjKey) (cn int64, err error) {
 	cli := goredisinjectors.InitRedisClient(
 		goredisinjectors.WithRedisAddr(addr),
 		goredisinjectors.WithRedisDB(m.index),
 	).(*redis.Client).WithTimeout(timeout)
 	defer func() {
-		if err = cli.Close(); err != nil {
+		if cerr := cli.Close(); cerr != nil {
+			err = cerr
 			return
 		}
 	}()
@@ -290,6 +339,7 @@ func (m *DBSlot) migrate(ctx context.Context, addr string, timeout time.Duration
 		if err != nil {
 			return
 		}
+		cn++
 	}
 
 	return

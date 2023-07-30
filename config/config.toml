@@ -9,6 +9,8 @@ databases = 16
 # set the number of slots, 
 # Default slots is 1024
 # set slots<=0, don't use slots
+# set slots, don't change
+# if change, use migrate** cmd migrate new slots from old
 slots = 0
 
 # Sync commit to disk if possible

@@ -19,6 +19,7 @@ func NewBatch(store *Storager, wb *openkv.WriteBatch, locker sync.Locker) *Batch
 	return &Batch{store: store, WriteBatch: wb, Locker: locker}
 }
 
+// todo impl buffer commiter to commit (use list push/pop)
 func (b *Batch) Commit(ctx context.Context) error {
 	if b.store != nil && b.store.committer != nil {
 		return b.store.committer.Commit(ctx, b.WriteBatch)

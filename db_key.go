@@ -8,6 +8,7 @@ import (
 	"github.com/weedge/pkg/utils"
 )
 
+// buf change
 func binaryUvarint(buf []byte) (uint64, int, error) {
 	data, n := binary.Uvarint(buf)
 	if n == 0 {
@@ -86,7 +87,7 @@ func (db *DB) encodeDbIndexSlotTagKey(key []byte, dataType byte) []byte {
 	// need use varint-encoded to compress key, if tagLen is big
 	tagLenBuf := make([]byte, 2)
 	binary.BigEndian.PutUint16(tagLenBuf, uint16(len(tag)))
-	return utils.ConcatBytes([][]byte{db.indexVarBuf, slotBuf[0:n], tagLenBuf, tag, {dataType}, key})
+	return utils.ConcatBytes([][]byte{{Version, CodeTypeMeta}, db.indexVarBuf, slotBuf[0:n], tagLenBuf, tag, {dataType}, key})
 }
 
 type MetaObjKey struct {
