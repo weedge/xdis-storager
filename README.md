@@ -23,9 +23,11 @@ OK
 1) 1) (integer) 899
    2) (integer) 6
 127.0.0.1:6660> SLOTSMGRTTAGSLOT 127.0.0.1 6666 300000 899
-(integer) 6
+1) (integer) 6
+2) (integer) 0
 127.0.0.1:6660> SLOTSMGRTTAGSLOT 127.0.0.1 6666 300000 899
-(integer) 0
+1) (integer) 0
+2) (integer) 0
 ```
 ```shell
 127.0.0.1:6666> slotsinfo 0 1024 withsize
@@ -53,6 +55,6 @@ OK
 3) "z1"
 4) "100"
 ```
-
+tips: if use codis, dashboard config set `migration_method = "sync"`
 # reference
 * [ledisdb](https://github.com/ledisdb/ledisdb)
