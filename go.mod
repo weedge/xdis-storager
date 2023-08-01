@@ -11,7 +11,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/twmb/murmur3 v1.1.8
 	github.com/tylertreat/BoomFilters v0.0.0-20210315201527-1a82519a3e43
-	github.com/weedge/pkg v0.0.0-20230730110910-2af194257737
+	github.com/weedge/pkg v0.0.0-20230801170230-40c01f9e9a38
 )
 
 require (
