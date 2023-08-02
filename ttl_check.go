@@ -103,6 +103,7 @@ func (c *TTLChecker) check(ctx context.Context) {
 				t.Delete(tk)
 				t.Delete(mk)
 				t.Commit(ctx)
+				RemoveDBExpKeyStats(c.db.store, c.db.stats, mk, tk, nt)
 			}
 
 		}
