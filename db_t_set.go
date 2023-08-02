@@ -51,8 +51,7 @@ func (db *DBSet) delete(t *Batch, key []byte) (num int64, err error) {
 	return num, nil
 }
 
-func (db *DBSet) sIncrSize(ctx context.Context, key []byte, delta int64) (int64, error) {
-	t := db.batch
+func (db *DBSet) sIncrSize(ctx context.Context, t *Batch, key []byte, delta int64) (int64, error) {
 	sk := db.sEncodeSizeKey(key)
 
 	var err error
@@ -121,7 +120,7 @@ func (db *DBSet) SAdd(ctx context.Context, key []byte, args ...[]byte) (int64, e
 		t.Put(ek, nil)
 	}
 
-	if _, err = db.sIncrSize(ctx, key, num); err != nil {
+	if _, err = db.sIncrSize(ctx, t, key, num); err != nil {
 		return 0, err
 	}
 
@@ -348,7 +347,7 @@ func (db *DBSet) SRem(ctx context.Context, key []byte, args ...[]byte) (int64, e
 		}
 	}
 
-	if _, err = db.sIncrSize(ctx, key, -num); err != nil {
+	if _, err = db.sIncrSize(ctx, t, key, -num); err != nil {
 		return 0, err
 	}
 
@@ -554,19 +553,89 @@ func (db *DBSet) Dump(ctx context.Context, key []byte) (binVal []byte, err error
 }
 
 // Restore set rdb
-func (db *DBSet) Restore(ctx context.Context, key []byte, ttl int64, val rdb.Set) (err error) {
-	if _, err = db.Del(ctx, key); err != nil {
+func (db *DBSet) Restore(ctx context.Context, t *Batch, key []byte, ttl int64, val rdb.Set) (err error) {
+	if _, err = db.BatchDel(ctx, t, key); err != nil {
 		return
 	}
 
-	if _, err = db.SAdd(ctx, key, val...); err != nil {
+	if _, err = db.BatchSAdd(ctx, t, key, val...); err != nil {
 		return
 	}
 
 	if ttl > 0 {
-		if _, err = db.Expire(ctx, key, ttl); err != nil {
+		if _, err = db.BatchExpire(ctx, t, key, ttl); err != nil {
 			return
 		}
 	}
 	return
+}
+
+// BatchDel clears multi sets.
+func (db *DBSet) BatchDel(ctx context.Context, t *Batch, keys ...[]byte) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	for _, key := range keys {
+		if err := checkKeySize(key); err != nil {
+			return 0, err
+		}
+	}
+
+	nums := 0
+	for _, key := range keys {
+		if n, err := db.delete(t, key); err == nil && n > 0 {
+			nums++
+		}
+		db.rmExpire(t, SetType, key)
+	}
+
+	return int64(nums), nil
+}
+
+// BatchSAdd adds the value to the set.
+func (db *DBSet) BatchSAdd(ctx context.Context, t *Batch, key []byte, args ...[]byte) (int64, error) {
+	if len(args) == 0 {
+		return 0, nil
+	}
+	if err := checkKeySize(key); err != nil {
+		return 0, err
+	}
+
+	var err error
+	var ek []byte
+	var num int64
+	for i := 0; i < len(args); i++ {
+		if err := checkSetKMSize(ctx, key, args[i]); err != nil {
+			return 0, err
+		}
+
+		ek = db.sEncodeSetKey(key, args[i])
+
+		if v, err := db.IKV.Get(ek); err != nil {
+			return 0, err
+		} else if v == nil {
+			num++
+		}
+
+		t.Put(ek, nil)
+	}
+
+	if _, err = db.sIncrSize(ctx, t, key, num); err != nil {
+		return 0, err
+	}
+
+	db.SetKeyMeta(t, key, SetType)
+
+	return num, nil
+}
+
+// BatchExpire expires the set.
+func (db *DBSet) BatchExpire(ctx context.Context, t *Batch, key []byte, duration int64) (int64, error) {
+	if duration <= 0 {
+		return 0, ErrExpireValue
+	}
+
+	when := time.Now().Unix() + duration
+	db.expireAt(t, SetType, key, when)
+	return 1, nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/weedge/pkg/driver"
 	goredisinjectors "github.com/weedge/pkg/injectors/goredis-injectors"
 	"github.com/weedge/pkg/rdb"
+	"github.com/weedge/pkg/utils/asynctask"
 )
 
 // HashTag like redis cluster hash tag
@@ -139,6 +140,9 @@ func (m *DBSlot) MigrateKeyWithSameTag(ctx context.Context, addr string, timeout
 
 // SlotsRestore dest migrate addr restore slot obj [key ttlms serialized-value(rdb) ...]
 func (m *DBSlot) SlotsRestore(ctx context.Context, objs ...*driver.SlotsRestoreObj) (err error) {
+	m.batch.Lock()
+	defer m.batch.Unlock()
+
 	for _, obj := range objs {
 		key := obj.Key
 		val, err := rdb.DecodeDump(obj.Val)
@@ -156,20 +160,21 @@ func (m *DBSlot) SlotsRestore(ctx context.Context, objs ...*driver.SlotsRestoreO
 		// del -> store -> ttl(>0)
 		switch value := val.(type) {
 		case rdb.String:
-			m.string.Restore(ctx, key, ttl, value)
+			m.string.Restore(ctx, m.batch, key, ttl, value)
 		case rdb.Hash:
-			m.hash.Restore(ctx, key, ttl, value)
+			m.hash.Restore(ctx, m.batch, key, ttl, value)
 		case rdb.List:
-			m.list.Restore(ctx, key, ttl, value)
+			m.list.Restore(ctx, m.batch, key, ttl, value)
 		case rdb.Set:
-			m.set.Restore(ctx, key, ttl, value)
+			m.set.Restore(ctx, m.batch, key, ttl, value)
 		case rdb.ZSet:
-			m.zset.Restore(ctx, key, ttl, value)
+			m.zset.Restore(ctx, m.batch, key, ttl, value)
 		default:
 			return fmt.Errorf("invalid data type %T", value)
 		}
 	}
 
+	err = m.batch.Commit(ctx)
 	return
 }
 
@@ -321,19 +326,77 @@ func (m *DBSlot) findSlotAllTagMetaObjKey(ctx context.Context, tag []byte) (objs
 // more think:
 // use lsm tree as kvstore engine, need do sm compaction sstables when so many migrated keys, so need dump sstables then load it
 func (m *DBSlot) migrate(ctx context.Context, addr string, timeout time.Duration, keys ...*MetaObjKey) (cn int64, err error) {
+	if len(keys) == 0 {
+		return
+	}
+
+	commonOpts := goredisinjectors.DefaultRedisClientCommonOptions()
+	// smartClient/proxy to retry
+	commonOpts.MaxRetries = -1
 	cli := goredisinjectors.InitRedisClient(
 		goredisinjectors.WithRedisAddr(addr),
 		goredisinjectors.WithRedisDB(m.index),
+		goredisinjectors.WithRedisClientCommonOptions(*commonOpts),
 	).(*redis.Client).WithTimeout(timeout)
+	startTime := time.Now()
 	defer func() {
+		klog.CtxInfof(ctx, "migrate len(keys) %d cost %d ms", len(keys), time.Since(startTime).Milliseconds())
 		if cerr := cli.Close(); cerr != nil {
 			err = cerr
 			return
 		}
 	}()
 
-	// todo batch pipe @weedge
-	//binVals := make([][]byte, 0, len(keys))
+	if m.store.opts.MigrateAsyncTask.ChSize > 0 {
+		return m.asyncMigrateKey(ctx, cli, keys...)
+	}
+
+	return m.syncMigrateKey(ctx, cli, keys...)
+}
+
+func (m *DBSlot) asyncMigrateKey(ctx context.Context, cli *redis.Client, keys ...*MetaObjKey) (cn int64, err error) {
+	chSize := m.store.opts.MigrateAsyncTask.ChSize
+	workerCn := m.store.opts.MigrateAsyncTask.WorkerCn
+	if len(keys) < m.store.opts.MigrateAsyncTask.WorkerCn {
+		workerCn = len(keys)
+	}
+
+	var mu sync.RWMutex
+	var wgErrs []error
+	asyncTask, err := asynctask.GetNamedAsyncTask(
+		m.store.opts.MigrateAsyncTask.Name, chSize, workerCn,
+		func(err error) {
+			if err != nil {
+				mu.Lock()
+				wgErrs = append(wgErrs, err)
+				mu.Unlock()
+				return
+			}
+		})
+	if err != nil {
+		return
+	}
+
+	for _, key := range keys {
+		asyncTask.Post(&MigrateAsyncTask{Ctx: ctx, Cli: cli, Key: key, DBSlot: m})
+	}
+	asyncTask.Close()
+
+	if len(wgErrs) > 0 {
+		cn = int64(len(keys) - len(wgErrs))
+		errStr := ""
+		for _, e := range wgErrs {
+			errStr += e.Error()
+		}
+		err = fmt.Errorf("wgErrs:%s", errStr)
+		return
+	}
+	cn = int64(len(keys))
+
+	return
+}
+
+func (m *DBSlot) syncMigrateKey(ctx context.Context, cli *redis.Client, keys ...*MetaObjKey) (cn int64, err error) {
 	for _, key := range keys {
 		err = m.migrateKey(ctx, cli, key)
 		if err != nil {
@@ -341,7 +404,6 @@ func (m *DBSlot) migrate(ctx context.Context, addr string, timeout time.Duration
 		}
 		cn++
 	}
-
 	return
 }
 

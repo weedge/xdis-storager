@@ -19,6 +19,10 @@ slots = 0
 #  2: sync every commit
 dbSyncCommit = 0
 
+# buffer op(put/del) batch commit
+# default false
+bufferOpCommit = false
+
 # checking TTL (time to live) data every n seconds
 # if you set big, the expired data may not be deleted immediately
 ttlCheckInterval = 1
@@ -30,3 +34,12 @@ kvStoreName = "goleveldb.kvStore"
 
 # If not set, use dataDir/"kvStoreName"_data
 dbPath = ""
+
+
+# migrate key async task pipeline
+migrateAsyncTask.name = "migrate"
+# buff task size default 10
+# if chSize <=0  close migrateAsyncTask
+migrateAsyncTask.chSize = 10
+# worker pool size default 10
+migrateAsyncTask.workerCn = 10

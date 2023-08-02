@@ -621,19 +621,74 @@ func (db *DBString) Dump(ctx context.Context, key []byte) (binVal []byte, err er
 }
 
 // Restore string rdb
-func (db *DBString) Restore(ctx context.Context, key []byte, ttl int64, val rdb.String) (err error) {
-	if _, err = db.Del(ctx, key); err != nil {
+func (db *DBString) Restore(ctx context.Context, t *Batch, key []byte, ttl int64, val rdb.String) (err error) {
+	if _, err = db.BatchDel(ctx, t, key); err != nil {
 		return
 	}
 
-	if err = db.Set(ctx, key, val); err != nil {
+	if err = db.BatchSet(ctx, t, key, val); err != nil {
 		return
 	}
 
 	if ttl > 0 {
-		if _, err = db.Expire(ctx, key, ttl); err != nil {
+		if _, err = db.BatchExpire(ctx, t, key, ttl); err != nil {
 			return
 		}
 	}
 	return
+}
+
+// BatchDel deletes the data.
+func (db *DBString) BatchDel(ctx context.Context, t *Batch, keys ...[]byte) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+
+	codedKeys := make([][]byte, len(keys))
+	for i, k := range keys {
+		if err := checkKeySize(k); err != nil {
+			return 0, err
+		}
+		codedKeys[i] = db.encodeStringKey(k)
+	}
+
+	nums := 0
+	for i, k := range keys {
+		v, err := db.IKV.Get(codedKeys[i])
+		if err == nil && v != nil {
+			nums++
+		}
+		db.delete(t, k)
+		db.rmExpire(t, StringType, k)
+	}
+
+	return int64(nums), nil
+}
+
+// BatchSet sets the data.
+func (db *DBString) BatchSet(ctx context.Context, t *Batch, key []byte, value []byte) error {
+	if err := checkKeySize(key); err != nil {
+		return err
+	}
+	if err := checkValueSize(value); err != nil {
+		return err
+	}
+
+	ek := db.encodeStringKey(key)
+	t.Put(ek, value)
+	db.SetKeyMeta(t, key, StringType)
+
+	return nil
+}
+
+// BatchExpire expires the data.
+func (db *DBString) BatchExpire(ctx context.Context, t *Batch, key []byte, duration int64) (int64, error) {
+	if duration <= 0 {
+		return 0, ErrExpireValue
+	}
+
+	when := time.Now().Unix() + duration
+	db.expireAt(t, StringType, key, when)
+
+	return 1, nil
 }

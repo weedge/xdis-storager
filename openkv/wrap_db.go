@@ -67,6 +67,7 @@ func (db *DB) NewWriteBatch() *WriteBatch {
 	wb := new(WriteBatch)
 	wb.IWriteBatch = db.IDB.NewWriteBatch()
 	wb.db = db
+	wb.batchOpBuff = utils.NewBatchOpBuffer()
 	return wb
 }
 

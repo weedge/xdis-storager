@@ -72,9 +72,7 @@ func (db *DBList) delete(t *Batch, key []byte) (num int64, err error) {
 	return num, nil
 }
 
-func (db *DBList) lSetMeta(ek []byte, headSeq int32, tailSeq int32) (int32, error) {
-	t := db.batch
-
+func (db *DBList) lSetMeta(t *Batch, ek []byte, headSeq int32, tailSeq int32) (int32, error) {
 	size := tailSeq - headSeq + 1
 	if size < 0 {
 		return 0, fmt.Errorf("invalid meta sequence range [%d, %d]", headSeq, tailSeq)
@@ -119,7 +117,7 @@ func (db *DBList) lSignalAsReady(ctx context.Context, key []byte) {
 	db.lbKeys.signal(key)
 }
 
-func (db *DBList) lpush(ctx context.Context, key []byte, whereSeq int32, args ...[]byte) (int64, error) {
+func (db *DBList) lpush(ctx context.Context, t *Batch, key []byte, whereSeq int32, args ...[]byte) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -128,10 +126,6 @@ func (db *DBList) lpush(ctx context.Context, key []byte, whereSeq int32, args ..
 	var tailSeq int32
 	var size int32
 	var err error
-
-	t := db.batch
-	t.Lock()
-	defer t.Unlock()
 
 	metaKey := db.lEncodeMetaKey(key)
 	headSeq, tailSeq, size, err = db.lGetMeta(nil, metaKey)
@@ -173,13 +167,8 @@ func (db *DBList) lpush(ctx context.Context, key []byte, whereSeq int32, args ..
 		tailSeq = seq
 	}
 
-	db.lSetMeta(metaKey, headSeq, tailSeq)
+	db.lSetMeta(t, metaKey, headSeq, tailSeq)
 	db.SetKeyMeta(t, key, ListType)
-	err = t.Commit(ctx)
-
-	if err == nil {
-		db.lSignalAsReady(ctx, key)
-	}
 
 	return int64(size) + int64(pushCnt), err
 }
@@ -226,7 +215,7 @@ func (db *DBList) lpop(ctx context.Context, key []byte, whereSeq int32) ([]byte,
 	}
 
 	t.Delete(itemKey)
-	size, err = db.lSetMeta(metaKey, headSeq, tailSeq)
+	size, err = db.lSetMeta(t, metaKey, headSeq, tailSeq)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +277,7 @@ func (db *DBList) ltrim2(ctx context.Context, key []byte, startP, stopP int64) (
 		}
 	}
 
-	db.lSetMeta(ek, headSeq+start, headSeq+stop)
+	db.lSetMeta(t, ek, headSeq+start, headSeq+stop)
 	db.SetKeyMeta(t, key, ListType)
 
 	return t.Commit(ctx)
@@ -340,7 +329,7 @@ func (db *DBList) ltrim(ctx context.Context, key []byte, trimSize, whereSeq int3
 		t.Delete(itemKey)
 	}
 
-	size, err = db.lSetMeta(metaKey, headSeq, tailSeq)
+	size, err = db.lSetMeta(t, metaKey, headSeq, tailSeq)
 	if err != nil {
 		return 0, err
 	}
@@ -419,7 +408,21 @@ func (db *DBList) LTrimBack(ctx context.Context, key []byte, trimSize int32) (in
 
 // LPush push the value to the list.
 func (db *DBList) LPush(ctx context.Context, key []byte, args ...[]byte) (int64, error) {
-	return db.lpush(ctx, key, listHeadSeq, args...)
+	t := db.batch
+	t.Lock()
+	defer t.Unlock()
+
+	num, err := db.lpush(ctx, t, key, listHeadSeq, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	if err = t.Commit(ctx); err != nil {
+		return 0, err
+	}
+	db.lSignalAsReady(ctx, key)
+
+	return num, nil
 }
 
 // LSet sets the value at index.
@@ -524,7 +527,21 @@ func (db *DBList) RPop(ctx context.Context, key []byte) ([]byte, error) {
 
 // RPush rpushs the value .
 func (db *DBList) RPush(ctx context.Context, key []byte, args ...[]byte) (int64, error) {
-	return db.lpush(ctx, key, listTailSeq, args...)
+	t := db.batch
+	t.Lock()
+	defer t.Unlock()
+
+	num, err := db.lpush(ctx, t, key, listTailSeq, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	if err = t.Commit(ctx); err != nil {
+		return 0, err
+	}
+	db.lSignalAsReady(ctx, key)
+
+	return num, nil
 }
 
 // BLPop pops the list with block way.
@@ -697,19 +714,57 @@ func (db *DBList) Dump(ctx context.Context, key []byte) (binVal []byte, err erro
 }
 
 // Restore list rdb
-func (db *DBList) Restore(ctx context.Context, key []byte, ttl int64, val rdb.List) (err error) {
-	if _, err = db.Del(ctx, key); err != nil {
+func (db *DBList) Restore(ctx context.Context, t *Batch, key []byte, ttl int64, val rdb.List) (err error) {
+	if _, err = db.BatchDel(ctx, t, key); err != nil {
 		return
 	}
 
-	if _, err = db.RPush(ctx, key, val...); err != nil {
+	if _, err = db.BatchRPush(ctx, t, key, val...); err != nil {
 		return
 	}
 
 	if ttl > 0 {
-		if _, err = db.Expire(ctx, key, ttl); err != nil {
+		if _, err = db.BatchExpire(ctx, t, key, ttl); err != nil {
 			return
 		}
 	}
 	return
+}
+
+// BatchDel clears multi lists.
+func (db *DBList) BatchDel(ctx context.Context, t *Batch, keys ...[]byte) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	for _, key := range keys {
+		if err := checkKeySize(key); err != nil {
+			return 0, err
+		}
+	}
+
+	nums := 0
+	for _, key := range keys {
+		if n, err := db.delete(t, key); err == nil && n > 0 {
+			nums++
+		}
+		db.rmExpire(t, ListType, key)
+	}
+
+	return int64(nums), nil
+}
+
+// BatchRPush rpushs the value .
+func (db *DBList) BatchRPush(ctx context.Context, t *Batch, key []byte, args ...[]byte) (int64, error) {
+	return db.lpush(ctx, t, key, listTailSeq, args...)
+}
+
+func (db *DBList) BatchExpire(ctx context.Context, t *Batch, key []byte, duration int64) (int64, error) {
+	if duration <= 0 {
+		return 0, ErrExpireValue
+	}
+
+	when := time.Now().Unix() + duration
+	db.expireAt(t, ListType, key, when)
+
+	return 1, nil
 }

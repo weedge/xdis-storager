@@ -87,7 +87,7 @@ func (db *DBHash) hSetItem(ctx context.Context, key []byte, field []byte, value 
 	if v, _ := db.IKV.Get(ek); v != nil {
 		n = 0
 	} else {
-		if _, err := db.hIncrSize(ctx, key, 1); err != nil {
+		if _, err := db.hIncrSize(ctx, t, key, 1); err != nil {
 			return 0, err
 		}
 	}
@@ -96,8 +96,7 @@ func (db *DBHash) hSetItem(ctx context.Context, key []byte, field []byte, value 
 	return n, nil
 }
 
-func (db *DBHash) hIncrSize(ctx context.Context, key []byte, delta int64) (int64, error) {
-	t := db.batch
+func (db *DBHash) hIncrSize(ctx context.Context, t *Batch, key []byte, delta int64) (int64, error) {
 	sk := db.hEncodeSizeKey(key)
 
 	var err error
@@ -182,7 +181,7 @@ func (db *DBHash) HMset(ctx context.Context, key []byte, args ...driver.FVPair) 
 		t.Put(ek, args[i].Value)
 	}
 
-	if _, err := db.hIncrSize(ctx, key, num); err != nil {
+	if _, err := db.hIncrSize(ctx, t, key, num); err != nil {
 		return err
 	}
 
@@ -243,7 +242,7 @@ func (db *DBHash) HDel(ctx context.Context, key []byte, args ...[]byte) (int64, 
 		}
 	}
 
-	if _, err = db.hIncrSize(ctx, key, -num); err != nil {
+	if _, err = db.hIncrSize(ctx, t, key, -num); err != nil {
 		return 0, err
 	}
 
@@ -484,8 +483,8 @@ func (db *DBHash) Dump(ctx context.Context, key []byte) (binVal []byte, err erro
 }
 
 // Restore hash rdb
-func (db *DBHash) Restore(ctx context.Context, key []byte, ttl int64, val rdb.Hash) (err error) {
-	if _, err = db.Del(ctx, key); err != nil {
+func (db *DBHash) Restore(ctx context.Context, t *Batch, key []byte, ttl int64, val rdb.Hash) (err error) {
+	if _, err = db.BatchDel(ctx, t, key); err != nil {
 		return
 	}
 
@@ -494,14 +493,76 @@ func (db *DBHash) Restore(ctx context.Context, key []byte, ttl int64, val rdb.Ha
 		fv[i] = driver.FVPair{Field: val[i].Field, Value: val[i].Value}
 	}
 
-	if err = db.HMset(ctx, key, fv...); err != nil {
+	if err = db.BatchHMset(ctx, t, key, fv...); err != nil {
 		return
 	}
 
 	if ttl > 0 {
-		if _, err = db.Expire(ctx, key, ttl); err != nil {
+		if _, err = db.BatchExpire(ctx, t, key, ttl); err != nil {
 			return
 		}
 	}
 	return
+}
+
+// BatchDel cleans multi hash data.
+func (db *DBHash) BatchDel(ctx context.Context, t *Batch, keys ...[]byte) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	for _, key := range keys {
+		if err := checkKeySize(key); err != nil {
+			return 0, err
+		}
+	}
+
+	nums := 0
+	for _, key := range keys {
+		if n, err := db.delete(t, key); err == nil && n > 0 {
+			nums++
+		}
+		db.rmExpire(t, HashType, key)
+	}
+
+	return int64(nums), nil
+}
+
+// BatchHMset sets multi field-values.
+func (db *DBHash) BatchHMset(ctx context.Context, t *Batch, key []byte, args ...driver.FVPair) error {
+	var num int64
+	for i := 0; i < len(args); i++ {
+		if err := checkHashKFSize(ctx, key, args[i].Field); err != nil {
+			return err
+		} else if err := checkValueSize(args[i].Value); err != nil {
+			return err
+		}
+
+		ek := db.hEncodeHashKey(key, args[i].Field)
+
+		if v, err := db.IKV.Get(ek); err != nil {
+			return err
+		} else if v == nil {
+			num++
+		}
+
+		t.Put(ek, args[i].Value)
+	}
+
+	if _, err := db.hIncrSize(ctx, t, key, num); err != nil {
+		return err
+	}
+
+	db.SetKeyMeta(t, key, HashType)
+	return nil
+}
+
+// BatchExpire expires the data with duration.
+func (db *DBHash) BatchExpire(ctx context.Context, t *Batch, key []byte, duration int64) (int64, error) {
+	if duration <= 0 {
+		return 0, ErrExpireValue
+	}
+
+	when := time.Now().Unix() + duration
+	db.expireAt(t, HashType, key, when)
+	return 1, nil
 }

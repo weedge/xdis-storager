@@ -944,8 +944,8 @@ func (db *DBZSet) Dump(ctx context.Context, key []byte) (binVal []byte, err erro
 
 // Restore zset rdb
 // use int64 for zset score, not float
-func (db *DBZSet) Restore(ctx context.Context, key []byte, ttl int64, val rdb.ZSet) (err error) {
-	if _, err = db.Del(ctx, key); err != nil {
+func (db *DBZSet) Restore(ctx context.Context, t *Batch, key []byte, ttl int64, val rdb.ZSet) (err error) {
+	if _, err = db.BatchDel(ctx, t, key); err != nil {
 		return
 	}
 
@@ -954,14 +954,80 @@ func (db *DBZSet) Restore(ctx context.Context, key []byte, ttl int64, val rdb.ZS
 		sp[i] = driver.ScorePair{Score: int64(val[i].Score), Member: val[i].Member}
 	}
 
-	if _, err = db.ZAdd(ctx, key, sp...); err != nil {
+	if _, err = db.BatchZAdd(ctx, t, key, sp...); err != nil {
 		return
 	}
 
 	if ttl > 0 {
-		if _, err = db.Expire(ctx, key, ttl); err != nil {
+		if _, err = db.BatchExpire(ctx, t, key, ttl); err != nil {
 			return
 		}
 	}
 	return
+}
+
+// BatchDel clears multi zsets.
+func (db *DBZSet) BatchDel(ctx context.Context, t *Batch, keys ...[]byte) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	for _, key := range keys {
+		if err := checkKeySize(key); err != nil {
+			return 0, err
+		}
+	}
+
+	nums := 0
+	for _, key := range keys {
+		n, err := db.delete(t, key)
+		if err != nil {
+			return 0, err
+		}
+		if n > 0 {
+			nums++
+		}
+	}
+
+	return int64(nums), nil
+}
+
+// BatchZAdd add the members.
+func (db *DBZSet) BatchZAdd(ctx context.Context, t *Batch, key []byte, args ...driver.ScorePair) (int64, error) {
+	if len(args) == 0 {
+		return 0, nil
+	}
+
+	var num int64
+	for i := 0; i < len(args); i++ {
+		score := args[i].Score
+		member := args[i].Member
+
+		if err := checkZSetKMSize(key, member); err != nil {
+			return 0, err
+		}
+
+		if n, err := db.zSetItem(t, key, score, member); err != nil {
+			return 0, err
+		} else if n == 0 {
+			//add new
+			num++
+		}
+	}
+
+	if _, err := db.zIncrSize(t, key, num); err != nil {
+		return 0, err
+	}
+
+	return num, nil
+}
+
+// BatchExpire expires the zset.
+func (db *DBZSet) BatchExpire(ctx context.Context, t *Batch, key []byte, duration int64) (int64, error) {
+	if duration <= 0 {
+		return 0, ErrExpireValue
+	}
+
+	when := time.Now().Unix() + duration
+	db.expireAt(t, ZSetType, key, when)
+	return 1, nil
 }

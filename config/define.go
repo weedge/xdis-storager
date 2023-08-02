@@ -8,6 +8,9 @@ const (
 
 	DefaultTTLCheckInterval = 1
 	MaxTTLCheckInterval     = 3600
+
+	DefaultChSize   = 10
+	DefaultWorkerCn = 10
 )
 
 const (
