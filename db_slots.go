@@ -381,7 +381,7 @@ func (m *DBSlot) asyncMigrateKeys(ctx context.Context, cli *redis.Client, keys .
 	for i := range keys {
 		if i > 0 && i%m.store.opts.MigrateBatchKeyCn == 0 {
 			asyncTask.Post(&MigrateAsyncTask{Ctx: ctx, Cli: cli, Keys: keys[cn:i], DBSlot: m})
-			cn += int64(i)
+			cn += int64(m.store.opts.MigrateBatchKeyCn)
 		}
 	}
 	asyncTask.Post(&MigrateAsyncTask{Ctx: ctx, Cli: cli, Keys: keys[cn:], DBSlot: m})
@@ -408,7 +408,7 @@ func (m *DBSlot) syncMigrateKeys(ctx context.Context, cli *redis.Client, keys ..
 			if err != nil {
 				return
 			}
-			cn += int64(i)
+			cn += int64(m.store.opts.MigrateBatchKeyCn)
 		}
 	}
 

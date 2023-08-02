@@ -12,7 +12,7 @@ const (
 	DefaultChSize   = 10
 	DefaultWorkerCn = 10
 
-	DefaultMgrtBatchKeyCn = 1000
+	DefaultMgrtBatchKeyCn = 10000
 )
 
 const (
