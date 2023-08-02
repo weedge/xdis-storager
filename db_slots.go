@@ -224,7 +224,7 @@ func (m *DBSlot) SlotsDel(ctx context.Context, slots ...uint64) (slotInfos []*dr
 		if key, err := m.findSlotFirstMetaObjKey(ctx, slot); err != nil && err != ErrKeyNotFound {
 			return nil, err
 		} else if key != nil {
-			if _, err = m.Del(ctx, key); err != nil {
+			if _, err = m.BatchDel(ctx, key); err != nil {
 				return nil, err
 			}
 			info.Num = slot
@@ -320,11 +320,12 @@ func (m *DBSlot) findSlotAllTagMetaObjKey(ctx context.Context, tag []byte) (objs
 // if in migrating stat, key not in src node, try request dest node, (key migrate cmd (restore, del) and w/r cmd must mutex)
 // offline case:
 // use this as migrate tools
-// To support migrate <-> redis
+// To support migrate <-> resp kv store
 // the dump value format is the same as redis.
 // https://github.com/sripathikrishnan/redis-rdb-tools/blob/master/docs/RDB_Version_History.textile
 // more think:
 // use lsm tree as kvstore engine, need do sm compaction sstables when so many migrated keys, so need dump sstables then load it
+// batch op no stream
 func (m *DBSlot) migrate(ctx context.Context, addr string, timeout time.Duration, keys ...*MetaObjKey) (cn int64, err error) {
 	if len(keys) == 0 {
 		return
@@ -348,13 +349,13 @@ func (m *DBSlot) migrate(ctx context.Context, addr string, timeout time.Duration
 	}()
 
 	if m.store.opts.MigrateAsyncTask.ChSize > 0 {
-		return m.asyncMigrateKey(ctx, cli, keys...)
+		return m.asyncMigrateKeys(ctx, cli, keys...)
 	}
 
-	return m.syncMigrateKey(ctx, cli, keys...)
+	return m.syncMigrateKeys(ctx, cli, keys...)
 }
 
-func (m *DBSlot) asyncMigrateKey(ctx context.Context, cli *redis.Client, keys ...*MetaObjKey) (cn int64, err error) {
+func (m *DBSlot) asyncMigrateKeys(ctx context.Context, cli *redis.Client, keys ...*MetaObjKey) (cn int64, err error) {
 	chSize := m.store.opts.MigrateAsyncTask.ChSize
 	workerCn := m.store.opts.MigrateAsyncTask.WorkerCn
 	if len(keys) < m.store.opts.MigrateAsyncTask.WorkerCn {
@@ -377,9 +378,13 @@ func (m *DBSlot) asyncMigrateKey(ctx context.Context, cli *redis.Client, keys ..
 		return
 	}
 
-	for _, key := range keys {
-		asyncTask.Post(&MigrateAsyncTask{Ctx: ctx, Cli: cli, Key: key, DBSlot: m})
+	for i := range keys {
+		if i > 0 && i%m.store.opts.MigrateBatchKeyCn == 0 {
+			asyncTask.Post(&MigrateAsyncTask{Ctx: ctx, Cli: cli, Keys: keys[cn:i], DBSlot: m})
+			cn += int64(i)
+		}
 	}
+	asyncTask.Post(&MigrateAsyncTask{Ctx: ctx, Cli: cli, Keys: keys[cn:], DBSlot: m})
 	asyncTask.Close()
 
 	if len(wgErrs) > 0 {
@@ -396,36 +401,67 @@ func (m *DBSlot) asyncMigrateKey(ctx context.Context, cli *redis.Client, keys ..
 	return
 }
 
-func (m *DBSlot) syncMigrateKey(ctx context.Context, cli *redis.Client, keys ...*MetaObjKey) (cn int64, err error) {
-	for _, key := range keys {
-		err = m.migrateKey(ctx, cli, key)
-		if err != nil {
-			return
+func (m *DBSlot) syncMigrateKeys(ctx context.Context, cli *redis.Client, keys ...*MetaObjKey) (cn int64, err error) {
+	for i := range keys {
+		if i > 0 && i%m.store.opts.MigrateBatchKeyCn == 0 {
+			err = m.migrateBatchKey(ctx, cli, keys[cn:i]...)
+			if err != nil {
+				return
+			}
+			cn += int64(i)
 		}
-		cn++
 	}
+
+	err = m.migrateBatchKey(ctx, cli, keys[cn:]...)
+	if err != nil {
+		return
+	}
+
+	return int64(len(keys)), nil
+}
+
+func (m *DBSlot) migrateBatchKey(ctx context.Context, cli *redis.Client, keys ...*MetaObjKey) (err error) {
+	objs := make([]*driver.SlotsRestoreObj, len(keys))
+	for i, key := range keys {
+		binVal, err := m.Dump(ctx, key)
+		if err != nil {
+			return err
+		}
+
+		ttl, err := m.TTL(ctx, key)
+		if err != nil {
+			return err
+		}
+		objs[i] = &driver.SlotsRestoreObj{
+			DB:    int32(m.index),
+			Key:   key.DataKey,
+			Val:   binVal,
+			TTLms: ttl * 1e3,
+		}
+	}
+
+	err = m.migrateSlotsRestoreObj(ctx, cli, objs...)
+	if err != nil {
+		return
+	}
+
+	_, err = m.BatchDel(ctx, keys...)
+	if err != nil {
+		return
+	}
+
 	return
 }
 
-func (m *DBSlot) migrateKey(ctx context.Context, cli *redis.Client, key *MetaObjKey) (err error) {
-	var binVal []byte
-	binVal, err = m.Dump(ctx, key)
-	if err != nil {
-		return
+func (m *DBSlot) migrateSlotsRestoreObj(ctx context.Context, cli *redis.Client, objs ...*driver.SlotsRestoreObj) (err error) {
+	args := make([]any, len(objs)*3+1)
+	args[0] = "slotsrestore"
+	for i := range objs {
+		args[3*i+1] = objs[i].Key
+		args[3*i+2] = objs[i].TTLms
+		args[3*i+3] = objs[i].Val
 	}
-
-	var ttl int64
-	ttl, err = m.TTL(ctx, key)
-	if err != nil {
-		return
-	}
-
-	err = cli.Do(ctx, "slotsrestore", key.DataKey, ttl*1e3, binVal).Err()
-	if err != nil {
-		return
-	}
-
-	_, err = m.Del(ctx, key)
+	err = cli.Do(ctx, args...).Err()
 	if err != nil {
 		return
 	}
@@ -471,19 +507,32 @@ func (m *DBSlot) TTL(ctx context.Context, key *MetaObjKey) (int64, error) {
 	}
 }
 
-func (m *DBSlot) Del(ctx context.Context, key *MetaObjKey) (int64, error) {
-	switch key.DataType {
-	case StringType:
-		return m.string.Del(ctx, key.DataKey)
-	case HashType:
-		return m.hash.Del(ctx, key.DataKey)
-	case ListType:
-		return m.list.Del(ctx, key.DataKey)
-	case SetType:
-		return m.set.Del(ctx, key.DataKey)
-	case ZSetType:
-		return m.zset.Del(ctx, key.DataKey)
-	default:
-		return 0, fmt.Errorf("un support metaKey dataType: %d", key.DataType)
+func (m *DBSlot) BatchDel(ctx context.Context, keys ...*MetaObjKey) (num int64, err error) {
+	m.batch.Lock()
+	defer m.batch.Unlock()
+
+	for _, key := range keys {
+		n := int64(0)
+		switch key.DataType {
+		case StringType:
+			n, err = m.string.BatchDel(ctx, m.batch, key.DataKey)
+		case HashType:
+			n, err = m.hash.BatchDel(ctx, m.batch, key.DataKey)
+		case ListType:
+			n, err = m.list.BatchDel(ctx, m.batch, key.DataKey)
+		case SetType:
+			n, err = m.set.BatchDel(ctx, m.batch, key.DataKey)
+		case ZSetType:
+			n, err = m.zset.BatchDel(ctx, m.batch, key.DataKey)
+		default:
+			return 0, fmt.Errorf("un support metaKey dataType: %d", key.DataType)
+		}
+		if err != nil {
+			return
+		}
+		num += n
 	}
+	err = m.batch.Commit(ctx)
+
+	return
 }

@@ -35,6 +35,8 @@ kvStoreName = "goleveldb.kvStore"
 # If not set, use dataDir/"kvStoreName"_data
 dbPath = ""
 
+# batch migrate key cn default 1000
+migrateBatchKeyCn = 1000
 
 # migrate key async task pipeline
 migrateAsyncTask.name = "migrate"

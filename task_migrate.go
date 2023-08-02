@@ -11,13 +11,13 @@ type MigrateAsyncTask struct {
 	Ctx    context.Context
 	DBSlot *DBSlot
 	Cli    *redis.Client
-	Key    *MetaObjKey
+	Keys   []*MetaObjKey
 }
 
 func (m *MigrateAsyncTask) Run() (err error) {
-	err = m.DBSlot.migrateKey(m.Ctx, m.Cli, m.Key)
+	err = m.DBSlot.migrateBatchKey(m.Ctx, m.Cli, m.Keys...)
 	if err != nil {
-		return fmt.Errorf("migrate key %+v %w", m.Key, err)
+		return fmt.Errorf("migrate len(keys) %d %w", len(m.Keys), err)
 	}
 
 	return
