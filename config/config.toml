@@ -38,6 +38,9 @@ dbPath = ""
 # batch migrate key cn default 10000
 migrateBatchKeyCn = 10000
 
+# notic: Depending on the restore lock db op, 
+#   if one db to lock becomes a serial operation, 
+#   no concurrent task requests are required, and the request backlog will time out
 # migrate key async task pipeline
 migrateAsyncTask.name = "migrate"
 # buff task size default 10
