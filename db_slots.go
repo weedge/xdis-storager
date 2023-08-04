@@ -432,6 +432,12 @@ func (m *DBSlot) migrateBatchKey(ctx context.Context, cli *redis.Client, keys ..
 		if err != nil {
 			return err
 		}
+		if ttl == -2 {
+			return ErrKeyNotFound
+		}
+		if ttl < 0 {
+			ttl = 0
+		}
 		objs[i] = &driver.SlotsRestoreObj{
 			DB:    int32(m.index),
 			Key:   key.DataKey,
