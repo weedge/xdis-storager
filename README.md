@@ -55,6 +55,14 @@ OK
 3) "z1"
 4) "100"
 ```
-tips: if use codis, dashboard config set `migration_method = "sync"`
-# reference
-* [ledisdb](https://github.com/ledisdb/ledisdb)
+Tips: if use codis-proxy, codis-dashboard config set `migration_method = "sync"`
+
+# Build & Inject
+see [**wedis**](https://github.com/weedge/wedis), just simple `go build/run`  to inject it and build/run.
+
+# SuperMarioBros
+1. [RediXSlots](https://github.com/weedge/RedisXSlot)
+2. [xdis-tikv](https://github.com/weedge/xdis-tikv)
+
+# Reference
+* [ledisdb](https://github.com/ledisdb/ledisdb) (keyspace type)
